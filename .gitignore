@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Model outputs (weights go to Hugging Face, not git) and smoke-test scratch data, training logs
+runs/
+*.log
+data_smoke/
+
+# Editors / OS
+.vscode/
+.idea/
+Thumbs.db
+
+# Packaging / tests
+dist/
+*.egg-info/
+.pytest_cache/
