@@ -132,4 +132,21 @@ dvwa-juiceshop AUROC 0.853 → 0.695 (`results/cyberjev_v2_len128*.md`). Full re
 ~140 tokens median plus ~25 for the question and option, so attacks in later headers or the
 body get cut. Keep 256.
 
-Next: ONNX + int8 on CPU for v2-l6; still ~3× off the ≤ 5 ms CPU target.
+### ONNX on CPU (v2-l6, 8 threads) — partial
+
+`scripts/onnx_cpu.py` exports `model.onnx` (87 MB) and a dynamic-int8 `model.int8.onnx`
+(22 MB) into the model folder and compares them with PyTorch. The first run was stopped
+(system low on memory) after two of the three variants:
+
+| variant | in-domain AUROC | in-domain DR@1%FPR | held-out AUROC | held-out DR@1%FPR | median ms | p95 ms |
+|---|---|---|---|---|---|---|
+| PyTorch fp32 | 0.995 | 0.968 | 0.953 | 0.464 | 13.7 | 28.2 |
+| ONNX fp32 | 0.995 | 0.968 | 0.953 | 0.464 | 11.8 | 38.1 |
+| ONNX int8 | pending | | | | | |
+
+ONNX fp32 matches PyTorch exactly and is ~15% faster at the median. int8 still to measure
+(rerun `python scripts/onnx_cpu.py --model runs/cyber-jev-v2-l6 --out results/onnx_v2_l6.md`;
+it reuses the exported files).
+
+Next: finish the int8 row; a second seed for v2 vs v2-l6. Still ~2–3× off the ≤ 5 ms CPU
+target; the remaining big lever is the two encoder passes per binary decision (one per option).
