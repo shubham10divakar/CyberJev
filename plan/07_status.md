@@ -101,5 +101,35 @@ What this says:
 - Caveat: dvwa-juiceshop is partly separable by path (attacks mostly on DVWA, normal all on
   Juice Shop), so its AUROC flatters every model somewhat.
 
-Next: step 3 (latency), then consider hard benign negatives (SQL-like text, code snippets)
-before M3.
+## M2 step 3 — latency (2026-09-28)
+
+### 6-layer base (`runs/cyber-jev-v2-l6`, from the Nano-Jev v0.1 backbone, MiniLM-L6)
+
+Same data and recipe as v2 (4 epochs, max_length 256; best dev NLL 0.114 at epoch 3,
+~6.5 min). One seed each, so small differences are noise; the held-out gap is not small.
+
+| Model | layers | in-domain AUROC | in-domain DR@1%FPR | held-out AUROC | held-out DR@1%FPR | dvwa FPR@0.5 | sqli FPR@0.5 |
+|---|---|---|---|---|---|---|---|
+| Cyber-Jev v2 | 12 | 0.996 | 0.971 | 0.881 | 0.343 | 0.392 | 0.593 |
+| Cyber-Jev v2-l6 | 6 | 0.995 | 0.968 | **0.953** | **0.457** | **0.212** | **0.413** |
+
+| Setting (median ms, 300 random test requests) | v2 (12 layers) | v2-l6 (6 layers) |
+|---|---|---|
+| CPU 8 threads, batch 1 | 27.8 | **14.3** |
+| CPU 1 thread, batch 1 | 75.5 | 37.2 |
+| GPU, batch 1 | 13.6 | 7.8 |
+| GPU, batch 64 (per decision) | 2.1 | 1.2 |
+
+The 6-layer model is 2× faster and **generalises better** held-out (AUROC 0.95 vs 0.88)
+with no in-domain loss. Plausible reason: the v0.1 backbone started from an MS MARCO
+cross-encoder; the 12-layer one may overfit the three training sources more. Worth a
+second seed before relying on it. **v2-l6 is the working model from here.**
+
+### max_length 128 (v2, no retraining): rejected
+
+Capping inputs at inference costs a lot on full requests: ai-waf DR@0.5 0.970 → 0.743,
+dvwa-juiceshop AUROC 0.853 → 0.695 (`results/cyberjev_v2_len128*.md`). Full requests are
+~140 tokens median plus ~25 for the question and option, so attacks in later headers or the
+body get cut. Keep 256.
+
+Next: ONNX + int8 on CPU for v2-l6; still ~3× off the ≤ 5 ms CPU target.
