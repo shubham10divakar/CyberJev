@@ -1,4 +1,4 @@
-# 07 — Status (2026-09-27)
+# 07 — Status (updated 2026-09-28)
 
 ## Done
 
@@ -22,7 +22,7 @@ Temperatures fitted on CSIC calib. DR = detection rate at a fixed false-positive
 | Nano-Jev v1.0 zero-shot | web-attacks | 0.370 | 0.370 | 0.493 | 0.237 | 0.138 |
 | Cyber-Jev dev | web-attacks | 0.814 | 0.450 | **0.810** | 0.040 | 0.161 |
 
-Full tables: `results/*.md`.
+Full tables: `results/m1_csic_only/*.md` (M1 data; not comparable with the v2 tables below).
 
 ## What went wrong on held-out
 
@@ -33,7 +33,7 @@ request", not "attack = contains an attack". That's a **training-data diversity 
 not a model-size or epochs problem. Cyber-Jev's higher held-out AUROC (0.81 vs 0.71) shows
 it ranks better, but no threshold fitted on CSIC transfers.
 
-## Latency (`results/latency_dev.md`)
+## Latency, M1 model (`results/m1_csic_only/latency_dev.md`)
 
 | Setting | Median ms |
 |---|---|
@@ -49,11 +49,57 @@ Far from the ≤ 5 ms CPU target. Two encoder passes per decision (one per optio
 Not a "no-go": the architecture learns (in-domain 0.92, better held-out ranking), and the
 failure has a clear cause. Next steps, in order:
 
-1. **Diverse training data.** Add `shengqin/web-attacks` *train* split (normal JSON/text +
+1. ✅ **Diverse training data** (done 2026-09-28, see below). Add `shengqin/web-attacks` *train* split (normal JSON/text +
    SQLi + XSS payloads) to training, and find a **new** held-out source (candidates to verify:
    `Kaveny/sql-injection`, `srimathi2026/sql-injection-datasets`, an XSS set, HttpParamsDataset).
    Also add benign non-shop requests so "safe" isn't one site.
-2. **Train longer.** Dev NLL was still falling fast (0.56 → 0.22 in epoch 2); try 4 epochs.
+2. ✅ **Train longer** (done: 4 epochs, best at epoch 3). Dev NLL was still falling fast (0.56 → 0.22 in epoch 2); try 4 epochs.
 3. **Latency.** (a) Compare against a 6-layer base (the Nano-Jev v0.1 backbone, about 2× faster);
    (b) ONNX + int8 on CPU; (c) cap max_length at 128 for HTTP.
 4. Only then M3 (prompt_injection, phishing_url).
+
+## M2 step 1–2 results — data v2, `runs/cyber-jev-v2` (2026-09-28)
+
+Data v2 (see `03_data.md`): train on CSIC + `shengqin/web-attacks` + `ai-waf`; held-out is
+new: `sqli-queries` (`zrmarine/sql_injection`) and `dvwa-juiceshop` (`vyykaaa/dataset-web-attack`).
+Training: from Nano-Jev v1.0, 4 epochs, max_length 256, 21.5k examples, ~11 min. Dev NLL by
+epoch 0.236 → 0.114 → **0.092** → 0.097; epoch 3 kept. Temperatures fitted on v2 calib.
+
+| Model | Test set | acc | macro-F1 | AUROC | DR@1%FPR | ECE (cal) |
+|---|---|---|---|---|---|---|
+| TF-IDF + LR | in-domain (3 sources) | 0.963 | 0.962 | 0.996 | 0.938 | 0.006 |
+| Cyber-Jev v2 | in-domain | **0.977** | **0.977** | 0.996 | **0.971** | 0.011 |
+| TF-IDF + LR | held-out | 0.519 | 0.459 | 0.657 | **0.354** | 0.392 |
+| Cyber-Jev M1 (`cyber-jev-dev`) | held-out | 0.520 | 0.346 | 0.702 | 0.043 | 0.106 |
+| Cyber-Jev v2 | held-out | **0.723** | **0.699** | **0.881** | 0.343 | 0.240 |
+
+Held-out by source (calibrated; FPR / DR at the default 0.5 threshold):
+
+| Model | Source | AUROC | DR@1%FPR | FPR@0.5 | DR@0.5 |
+|---|---|---|---|---|---|
+| TF-IDF + LR | dvwa-juiceshop | 0.347 | 0.003 | 0.853 | 0.704 |
+| Cyber-Jev M1 | dvwa-juiceshop | 0.150 | 0.005 | 1.000 | 1.000 |
+| Cyber-Jev v2 | dvwa-juiceshop | **0.853** | 0.084 | **0.392** | 0.958 |
+| TF-IDF + LR | sqli-queries | **0.992** | 0.889 | 0.795 | 0.999 |
+| Cyber-Jev M1 | sqli-queries | 0.869 | 0.190 | 0.994 | 1.000 |
+| Cyber-Jev v2 | sqli-queries | 0.991 | 0.840 | **0.593** | 0.999 |
+
+Tables: `results/cyberjev_v2*.md`, `results/tfidf*.md`, `results/m1model_v2_heldout.md`.
+
+What this says:
+
+- **Diversity fixed the "flag everything" failure.** The M1 model flags 100% / 99% of held-out
+  safe traffic; v2 flags 39% / 59%. On full requests from unseen apps (dvwa-juiceshop) v2 ranks
+  well (AUROC 0.85) where TF-IDF is worse than chance (0.35): this is where the encoder
+  earns its place.
+- **Still too many false alarms off-domain.** Benign SQL queries look like SQLi to both
+  models (59% flagged at 0.5), and ranking is fine (AUROC 0.99) but the threshold isn't.
+  The in-domain calibration does not transfer; a deployment would need per-site threshold
+  tuning, or training data with benign SQL-like / code-like text.
+- In-domain, v2 now beats TF-IDF on accuracy and DR@1%FPR (0.971 vs 0.938); ai-waf and
+  web-attacks are near-trivially separable, so CSIC (0.983 AUROC) is the informative source.
+- Caveat: dvwa-juiceshop is partly separable by path (attacks mostly on DVWA, normal all on
+  Juice Shop), so its AUROC flatters every model somewhat.
+
+Next: step 3 (latency), then consider hard benign negatives (SQL-like text, code snippets)
+before M3.
