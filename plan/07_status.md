@@ -2,7 +2,7 @@
 
 ## Done
 
-- **M0 setup.** `cyber_jev/` is its own git repo (no commits yet) and is listed in
+- **M0 setup.** `cyber_jev/` is its own git repo and is listed in
   `code_repo/.git/info/exclude`, so it can't be committed into nano-jev. Package copied and
   renamed; schema, decider, CLI, data, tests adapted. `pytest`: 36 passed, 4 skipped
   (network tests: no published weights yet).

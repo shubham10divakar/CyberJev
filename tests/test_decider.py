@@ -71,3 +71,15 @@ def test_calibration_and_config_are_loaded(decider):
 def test_load_helper(tiny_model_dir):
     d = cyberjev.load(str(tiny_model_dir), device="cpu")
     assert d.version == "0.0-test"
+
+
+def test_normalize_full_request_drops_boilerplate_keeps_payload_headers():
+    raw = ("GET https://shop.example/search?q=%3Cscript%3E HTTP/1.1\r\n"
+           "Host: shop.example\r\nAccept: */*\r\nAccept-Language: en\r\nSec-Fetch-Mode: navigate\r\n"
+           "Referer: https://evil.example/{{7*7}}\r\n\r\nid=1+OR+1%3D1")
+    assert normalize_http(raw) == ("GET /search?q=<script> HTTP/1.1\nHost: shop.example\n"
+                                   "Referer: https://evil.example/{{7*7}}\nbody: id=1 OR 1=1")
+
+
+def test_normalize_bare_payload_is_only_decoded():
+    assert normalize_http("<svg onload=alert(1)>\n%27") == "<svg onload=alert(1)>\n'"

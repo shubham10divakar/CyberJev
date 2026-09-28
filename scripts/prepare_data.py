@@ -1,7 +1,9 @@
-"""Download datasets and write train / calib / test JSONL files.
+"""Download datasets and write the in-domain splits and the held-out test set.
 
-    python scripts/prepare_data.py --preset default              # -> data/{train,calib,test}.jsonl
-    python scripts/prepare_data.py --heldout --out data_heldout  # -> data_heldout/test.jsonl
+    python scripts/prepare_data.py --preset default
+        # -> data/{train,calib,test}.jsonl and data_heldout/test.jsonl
+
+Both are built in one run so held-out examples that also occur in training can be dropped.
 """
 
 import argparse
@@ -11,37 +13,44 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from cyberjev.data import build_all, build_heldout  # noqa: E402
+from cyberjev.data import build_all  # noqa: E402
 
 PRESETS = {
-    "smoke": dict(http_train=500, http_calib=200, http_test=200),
-    "default": dict(http_train=10000, http_calib=1500, http_test=3000),
+    "smoke": dict(csic_train=300, csic_calib=100, csic_test=100,
+                  web_train=300, web_calib=100, web_test=100,
+                  waf_train=300, waf_calib=100, waf_test=100,
+                  sqli_heldout=200, reqs_heldout=200),
+    # ai-waf has ~9.5k train / 1.2k calib+test after the 80/10/10 split, so it takes them all.
+    "default": dict(csic_train=6000, csic_calib=500, csic_test=1500,
+                    web_train=6000, web_calib=500, web_test=1500,
+                    waf_train=10000, waf_calib=600, waf_test=1200,
+                    sqli_heldout=6000, reqs_heldout=6000),
 }
+
+
+def write(path: Path, examples: list[dict]):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        for ex in examples:
+            f.write(json.dumps(ex, ensure_ascii=False) + "\n")
+    counts = Counter((ex["source"].split("/")[0], ex["options"][ex["label"]]) for ex in examples)
+    print(f"{path}: {len(examples)} examples")
+    for (src, lab), c in sorted(counts.items()):
+        print(f"    {src:<16} {lab:<8} {c}")
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--preset", default="default", choices=PRESETS)
     ap.add_argument("--out", default="data")
+    ap.add_argument("--heldout-out", default="data_heldout")
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--heldout", action="store_true",
-                    help="build the held-out test set (datasets never used in training)")
     args = ap.parse_args()
 
-    if args.heldout:
-        splits = {"test": build_heldout(seed=args.seed)}
-    else:
-        splits = build_all(PRESETS[args.preset], seed=args.seed)
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-    for name, examples in splits.items():
-        with open(out / f"{name}.jsonl", "w", encoding="utf-8") as f:
-            for ex in examples:
-                f.write(json.dumps(ex, ensure_ascii=False) + "\n")
-        counts = Counter((ex["decision"], ex["options"][ex["label"]]) for ex in examples)
-        print(f"{name}: {len(examples)} examples")
-        for (dec, lab), c in sorted(counts.items()):
-            print(f"    {dec:<17} {lab:<12} {c}")
+    splits = build_all(PRESETS[args.preset], seed=args.seed)
+    for name in ("train", "calib", "test"):
+        write(Path(args.out) / f"{name}.jsonl", splits[name])
+    write(Path(args.heldout_out) / "test.jsonl", splits["heldout"])
 
 
 if __name__ == "__main__":

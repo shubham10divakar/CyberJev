@@ -10,9 +10,45 @@ Every example uses Nano-Jev's format:
 
 ## Sources
 
-| Decision | In-domain (train / calib / test) | Held-out (never trained on) |
+### `http_attack` (v2, 2026-09-28)
+
+M1 trained only on CSIC, whose "safe" requests all come from one shop, so the model learned
+"safe = looks like CSIC". v2 trains on three sources and tests on two new ones.
+
+| Role | Source | What it is | License |
+|---|---|---|---|
+| train / calib / test | CSIC 2010 — `bridge4/CSIC2010_dataset_classification` | requests to one synthetic shop, normal / anomalous | (CSIC terms) |
+| train / calib / test | `shengqin/web-attacks` (train split → train, test split → calib/test) | bare payloads: normal text/JSON, XSS, SQLi | none stated |
+| train / calib / test | `notesbymuneeb/ai-waf-dataset` (80/10/10) | full requests to ~7.7k hosts, benign / malicious (XSS, SQLi, SSTI, traversal, header attacks, ...) | MIT |
+| held-out | `zrmarine/sql_injection` (6000 sampled) | SQL queries and SQLi payloads; benign side includes ordinary SQL, a hard negative | none stated |
+| held-out | `vyykaaa/dataset-web-attack` test split | DVWA + Juice Shop requests, 20 attack types | none stated |
+
+Checked and **not used**: `YangYang-Research/web-attack-detection` / `truongp/...` (identical
+copies; contain CSIC, and many rows are headers only), `Kaveny/sql-injection` (chat-formatted),
+`srimathi2026/sql-injection-datasets` (empty repo), `darkknight25/WAF_DETECTION_DATASET` (broken
+JSONL), and the many `*xss-probe*` repos (they probe the HF viewer, not datasets).
+
+Held-out caveats: in `dvwa-juiceshop` most attacks target DVWA's `/vulnerabilities/sqli/`
+while all normal traffic is Juice Shop, so path alone separates much of it; read its
+per-source numbers with that in mind. Licences marked "none stated" are used for research
+evaluation only; check before any release that ships data.
+
+Current sizes (`python scripts/prepare_data.py`):
+
+```
+data/train.jsonl        21550  csic 6000 · web-attacks 6000 · ai-waf 9550   (attack 52%)
+data/calib.jsonl         1600  csic 500  · web-attacks 500  · ai-waf 600
+data/test.jsonl          4200  csic 1500 · web-attacks 1500 · ai-waf 1200
+data_heldout/test.jsonl 10320  sqli-queries 6000 (attack 36%) · dvwa-juiceshop 4320 (attack 73%)
+```
+
+No text occurs in more than one split; held-out examples that match any in-domain text
+are dropped.
+
+### Other decisions
+
+| Decision | In-domain | Held-out |
 |---|---|---|
-| `http_attack` | CSIC 2010 — `bridge4/CSIC2010_dataset_classification` (43k train / 18.5k test requests) | `shengqin/web-attacks` test split: 1013 normal, 1986 XSS, 2524 SQLi payloads |
 | `prompt_injection` | `deepset/prompt-injections`, `xTRam1/safe-guard-prompt-injection` (to verify) | `jackhhao/jailbreak-classification` (to verify) |
 | `phishing_url` | a malicious-URL set, e.g. `surajshelke/malicious_url` (to verify) | a second URL set from a different source (to pick) |
 
@@ -20,11 +56,17 @@ Every example uses Nano-Jev's format:
 
 ## Text format
 
-- **HTTP (CSIC):** keep the request line and body, URL-decode them, drop the headers
-  (they are identical boilerplate in CSIC, and dropping them keeps inputs short, which
-  helps latency). Already implemented in `_staging/prepare_attack_data.py`.
-- **Prompts:** raw text, truncated to max_length.
-- **URLs:** raw URL string.
+`cyberjev.schema.normalize_http` is used for training data and at inference:
+
+- **Full requests:** request line (scheme and host stripped), then every header except
+  content-negotiation boilerplate (`Accept*`, `Connection`, `Cache-Control`, `Pragma`,
+  `Content-Length`, `Sec-CH-*`, `Sec-Fetch-*`, ...), then `body: ...`; URL-decoded. Headers
+  that can carry payloads (User-Agent, Referer, Cookie, Host, X-*) are kept.
+- **CSIC:** request line and body only (its headers are identical on every request, bar a
+  random session cookie that would defeat deduplication).
+- **Bare payloads:** URL-decoded only.
+- **Prompts:** raw text, truncated to max_length. **URLs:** raw URL string.
+- Token lengths: payloads ~40, requests median 80–160, ~5% of full requests exceed 256.
 
 ## Splits
 
@@ -41,12 +83,7 @@ Every example uses Nano-Jev's format:
   rate at fixed FPR), not only accuracy.
 - CSIC comes from a single synthetic web shop, so held-out results matter more than
   in-domain ones.
-
-## Prototype already built (in `_staging/`)
-
-```
-data_attack/train.jsonl          10000  (attack 6270 / safe 3730)
-data_attack/calib.jsonl           1500  (attack 906 / safe 594)
-data_attack/test.jsonl            3000  (attack 1846 / safe 1154)
-data_attack_heldout/test.jsonl    5523  (attack 4510 / safe 1013)
-```
+- ai-waf looks synthetic: TF-IDF separates it perfectly (AUROC 1.000). It adds diversity of
+  safe traffic, not difficulty.
+- Reports break every test set down by source (`by_source`), since a pooled number can hide
+  a source where all safe examples are flagged.

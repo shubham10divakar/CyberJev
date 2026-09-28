@@ -19,7 +19,7 @@ from sklearn.linear_model import LogisticRegression
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from cyberjev.report import (by_decision, decision_report, labels_of, read_jsonl,  # noqa: E402
-                             render_table, save)
+                             render_table, save, sources_of)
 
 
 def as_logits(clf, X) -> torch.Tensor:
@@ -53,7 +53,8 @@ def main():
         ms = 1000 * (time.time() - t0) / len(states)
         c_logits = as_logits(clf, vec.transform([ex["state"] for ex in calib[dec]]))
         report[dec] = decision_report(c_logits, labels_of(calib[dec]),
-                                      t_logits, labels_of(test[dec]), ms)
+                                      t_logits, labels_of(test[dec]), ms,
+                                      sources_of(test[dec]))
 
     table = render_table(f"TF-IDF + LR on `{args.test_data or args.data}`", report)
     print(table)
