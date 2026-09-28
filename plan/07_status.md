@@ -132,21 +132,28 @@ dvwa-juiceshop AUROC 0.853 → 0.695 (`results/cyberjev_v2_len128*.md`). Full re
 ~140 tokens median plus ~25 for the question and option, so attacks in later headers or the
 body get cut. Keep 256.
 
-### ONNX on CPU (v2-l6, 8 threads) — partial
+### ONNX on CPU (v2-l6, 8 threads)
 
 `scripts/onnx_cpu.py` exports `model.onnx` (87 MB) and a dynamic-int8 `model.int8.onnx`
-(22 MB) into the model folder and compares them with PyTorch. The first run was stopped
-(system low on memory) after two of the three variants:
+(22 MB) into the model folder and compares them with PyTorch, one variant per process
+(a first all-in-one run was stopped for low system memory). Held-out is a fixed random
+sample of 3000, so its numbers differ slightly from the full-set tables above.
+`results/onnx_v2_l6.md`:
 
-| variant | in-domain AUROC | in-domain DR@1%FPR | held-out AUROC | held-out DR@1%FPR | median ms | p95 ms |
-|---|---|---|---|---|---|---|
-| PyTorch fp32 | 0.995 | 0.968 | 0.953 | 0.464 | 13.7 | 28.2 |
-| ONNX fp32 | 0.995 | 0.968 | 0.953 | 0.464 | 11.8 | 38.1 |
-| ONNX int8 | pending | | | | | |
+| variant | size MB | in-domain AUROC | in-domain DR@1%FPR | held-out AUROC | held-out DR@1%FPR | median ms | p95 ms |
+|---|---|---|---|---|---|---|---|
+| PyTorch fp32 | 87 | 0.995 | 0.968 | 0.958 | 0.517 | 12.7 | 25.0 |
+| ONNX fp32 | 87 | 0.995 | 0.968 | 0.958 | 0.517 | 11.0 | 29.4 |
+| ONNX int8 | 22 | 0.995 | 0.966 | 0.960 | 0.495 | **8.1** | 23.4 |
 
-ONNX fp32 matches PyTorch exactly and is ~15% faster at the median. int8 still to measure
-(rerun `python scripts/onnx_cpu.py --model runs/cyber-jev-v2-l6 --out results/onnx_v2_l6.md`;
-it reuses the exported files).
+int8 costs nothing measurable in accuracy, is 4× smaller and 1.6× faster than PyTorch.
+Still ~1.6× off the ≤ 5 ms CPU target at the median, and p95 (~23 ms) is dominated by long
+requests.
 
-Next: finish the int8 row; a second seed for v2 vs v2-l6. Still ~2–3× off the ≤ 5 ms CPU
-target; the remaining big lever is the two encoder passes per binary decision (one per option).
+Next:
+1. **One pass per binary decision.** Each decision scores both options (two encoder
+   passes). Scoring only the threat option against a fixed zero, or caching, would roughly
+   halve latency: the most likely route to ≤ 5 ms.
+2. **Second seed** for v2 vs v2-l6 before relying on the 6-layer model's held-out lead.
+3. **Hard benign negatives** (SQL-like text, code snippets) to cut off-domain false alarms.
+4. Then M3 (prompt_injection, phishing_url).
