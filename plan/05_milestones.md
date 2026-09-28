@@ -11,4 +11,7 @@
 | M6 | **Package**: CLI `cyber-jev`, README, model card, tests, smoke test | `pip install -e .` + `cyber-jev http_attack ...` works |
 | M7 | **Release (only when asked)**: HF `sdmlai/cyber-jev` v0.1, PyPI `cyber-jev` 0.1.0 | published |
 
+Status (2026-09-28): M0 ✅, M1 ✅, M2 in progress (continue; data v2 fixed held-out
+failure), M5 partly (bench + ONNX int8: 8.1 ms CPU median, target ≤ 5 ms). See `08_next_run.md`.
+
 M0–M2 are the first work session. Nothing gets published or pushed without an explicit go.

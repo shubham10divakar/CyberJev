@@ -43,26 +43,34 @@ Inputs are URL-decoded before scoring, the same way the training data was prepar
 
 ```bash
 pip install -e ".[train,test]"
+pip install onnx onnxruntime                                  # only for scripts/onnx_cpu.py
 set PYTHONUTF8=1                                              # Windows console: tables use →
 
-python scripts/prepare_data.py                                # data/{train,calib,test}.jsonl
-python scripts/prepare_data.py --heldout --out data_heldout   # data_heldout/test.jsonl
-python scripts/train.py --base <nano-jev v1.0 folder> --out runs/cyber-jev-dev --max-length 256
-python scripts/evaluate.py --model runs/cyber-jev-dev --max-length 256
-python scripts/evaluate.py --model runs/cyber-jev-dev --no-save --max-length 256 \
-    --test-data data_heldout --results-dir results --name cyberjev_heldout
+python scripts/prepare_data.py            # data/{train,calib,test}.jsonl + data_heldout/test.jsonl
+python scripts/train.py --base <nano-jev v0.1 folder> --out runs/cyber-jev-v2-l6 --max-length 256 --epochs 4
+python scripts/evaluate.py --model runs/cyber-jev-v2-l6 --max-length 256 --results-dir results --name cyberjev_v2_l6
+python scripts/evaluate.py --model runs/cyber-jev-v2-l6 --no-save --max-length 256     --test-data data_heldout --results-dir results --name cyberjev_v2_l6_heldout
 python scripts/baselines.py                                   # TF-IDF + LR
 python scripts/baselines.py --test-data data_heldout --name tfidf_heldout
-python scripts/bench_latency.py --model runs/cyber-jev-dev
+python scripts/bench_latency.py --model runs/cyber-jev-v2-l6
+python scripts/onnx_cpu.py --model runs/cyber-jev-v2-l6 --out results/onnx_v2_l6.md
 pytest
 ```
 
-## Data
+The 6-layer base is Nano-Jev v0.1 (`../nano_jev/runs/nano-jev-v0.1`); the 12-layer
+`cyber-jev-v2` used Nano-Jev v1.0. Weights live in `runs/` (git-ignored).
+
+## Data (`http_attack` v2)
 
 | | Source | Size |
 |---|---|---|
-| train / calib / test | CSIC 2010 HTTP requests ([`bridge4/CSIC2010_dataset_classification`](https://huggingface.co/datasets/bridge4/CSIC2010_dataset_classification)); headers dropped, URL-decoded, deduplicated, no train/test overlap | 10000 / 1500 / 3000 |
-| held-out | SQLi / XSS / normal payloads from a different source ([`shengqin/web-attacks`](https://huggingface.co/datasets/shengqin/web-attacks)) | 5523 |
+| train / calib / test | CSIC 2010 ([`bridge4/CSIC2010_dataset_classification`](https://huggingface.co/datasets/bridge4/CSIC2010_dataset_classification)) | 6000 / 500 / 1500 |
+| train / calib / test | payloads ([`shengqin/web-attacks`](https://huggingface.co/datasets/shengqin/web-attacks)) | 6000 / 500 / 1500 |
+| train / calib / test | full requests, many hosts ([`notesbymuneeb/ai-waf-dataset`](https://huggingface.co/datasets/notesbymuneeb/ai-waf-dataset)) | 9550 / 600 / 1200 |
+| held-out | SQL queries and SQLi ([`zrmarine/sql_injection`](https://huggingface.co/datasets/zrmarine/sql_injection)) | 6000 |
+| held-out | DVWA + Juice Shop requests ([`vyykaaa/dataset-web-attack`](https://huggingface.co/datasets/vyykaaa/dataset-web-attack)) | 4320 |
+
+Details, text format and caveats: [`plan/03_data.md`](plan/03_data.md).
 
 ## Results
 

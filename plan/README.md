@@ -23,6 +23,7 @@ d.http_attack("GET /login?user=admin' OR '1'='1' -- HTTP/1.1")
 | [05_milestones.md](05_milestones.md) | Ordered steps with done-criteria |
 | [06_risks_and_open_questions.md](06_risks_and_open_questions.md) | Risks, licences, decisions still open |
 | [07_status.md](07_status.md) | Latest results and the M2 go/no-go decision |
+| [08_next_run.md](08_next_run.md) | **Start here next session**: where things stand, what to run next |
 
 ## Status
 
@@ -30,6 +31,7 @@ d.http_attack("GET /login?user=admin' OR '1'='1' -- HTTP/1.1")
 |---|---|
 | 2026-09-27 | Plan written. `http_attack` data prototype built. |
 | 2026-09-27 | M0 done (package, tests pass). M1 done: first `http_attack` model. M2: continue, fix training-data diversity first (see 07). |
+| 2026-09-28 | M2 steps 1–3: data v2 (3 train sources, new held-out), 4-epoch runs, 6-layer model `v2-l6` (held-out AUROC 0.95), ONNX int8 8.1 ms CPU. Next: one pass per decision (see 08). |
 
 ## Origin
 
