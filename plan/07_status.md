@@ -339,3 +339,59 @@ so its column is the share caught at 0.5.
   only reaches 0.740; JPxxx is closer to training (TF-IDF 0.927).
 - In-domain is easy for TF-IDF (0.96–0.99), as it was for http_attack. The M4 model has to
   beat TF-IDF out of domain, where M2 showed the cross-encoder's advantage.
+
+## M4 — joint model on all three decisions, seed 0 (2026-09-29)
+
+`bash scripts/m4_runs.sh 0`: 6-layer from Nano-Jev v0.1, data v4, 4 epochs, best epoch by dev
+NLL. Joint `v4-l6` (44.9k examples, 172 s/epoch, best epoch 2) vs single-decision models
+(`v3-l6` for http, `v4-l6-pi` best epoch 2, `v4-l6-url` best epoch 1: dev NLL rose after).
+AUROC, two-pass, calibrated (in-domain / held-out / val):
+
+| decision | model | in-domain | held-out | val |
+|---|---|---|---|---|
+| http_attack | **joint v4-l6** | 0.994 | **0.956** | **0.911** |
+| | single v3-l6 | 0.997 | 0.949 | 0.909 |
+| prompt_injection | **joint v4-l6** | 0.995 | 0.766 | 0.676 |
+| | single v4-l6-pi | 0.993 | 0.715 | 0.558 |
+| | TF-IDF | 0.992 | **0.887** | **0.740** |
+| | length only | 0.579 | 0.798 | 0.502 |
+| | zero-shot (v3-l6) | 0.786 | 0.493 | 0.651 |
+| phishing_url | **joint v4-l6** | 0.966 | 0.798 | **0.940** |
+| | single v4-l6-url | 0.958 | **0.814** | 0.935 |
+| | TF-IDF | 0.960 | 0.710 | 0.927 |
+| | length only | 0.544 | 0.800 | 0.660 |
+
+By source (held-out; FPR / DR at 0.5):
+
+| source | joint | single | TF-IDF | length |
+|---|---|---|---|---|
+| dvwa-juiceshop AUROC (FPR) | **0.961** (0.14) | 0.852 (0.31) | | |
+| sqli-queries AUROC (FPR) | 0.988 (0.23) | 0.988 (0.20) | | |
+| waf-v2 (val) AUROC (FPR) | 0.878 (**0.16**) | 0.875 (0.45) | | |
+| deepset AUROC | 0.835 | 0.725 | **0.904** | 0.813 |
+| jackhhao AUROC (FPR) | 0.727 (0.72) | 0.714 (0.76) | **0.952** (0.61) | 0.868 (0.96) |
+| phishtrap AUROC | 0.844 | **0.862** | 0.780 | 0.861 |
+| destroylist DR@0.5 | 0.57 | 0.58 | 0.55 | 0.10 |
+
+One pass (`results/single_pass_v4_l6*.md`), AUROC held-out / val:
+
+| decision | two-pass | threat-only | safe-only | val picks |
+|---|---|---|---|---|
+| http_attack (joint) | 0.956 / 0.911 | 0.951 / 0.907 | 0.956 / 0.912 | safe-only (by 0.005) |
+| prompt_injection (joint) | 0.766 / 0.676 | **0.861 / 0.749** | 0.672 / 0.578 | threat-only |
+| phishing_url (joint) | 0.798 / 0.940 | 0.789 / 0.937 | 0.802 / 0.939 | safe-only |
+
+**Findings (one seed):**
+- **Joint ≥ single.** http_attack is as good or better (dvwa 0.852 → 0.961, waf-v2 FPR@0.5
+  0.45 → 0.16); prompt_injection gains a lot from joint training (held-out +0.05, val +0.12);
+  phishing_url is within ~0.02. The plan's M4 bar (joint within ~1 point) is met or beaten.
+- **prompt_injection does not generalise yet.** Out of domain it is below TF-IDF (held-out
+  0.766 vs 0.887, val 0.676 vs 0.740) and flags 72% of jackhhao's benign role-play personas.
+  Its one-pass threat-only score is much better (0.861 / 0.749, level with TF-IDF on val):
+  the "safe" logit is what breaks out of domain. Likely causes: short, templated training
+  prompts (median ~50 chars; S-Labs "reveal your guidelines" patterns) vs long in-the-wild
+  prompts, and the 256-token cut. Same story as http_attack M1 → data diversity problem.
+- **phishing_url beats TF-IDF but not length on PhishTrap** (0.844–0.862 vs length 0.861);
+  on val it is best (0.940). The URL model overfits fast (best epoch 1).
+- The val-picked one-pass variant differs per decision and model now (safe-only for http and
+  URL on the joint model), so one_pass.json is per decision, as built.

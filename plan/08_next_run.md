@@ -93,6 +93,16 @@ decisions for reference: held-out AUROC 0.49 (PI) / 0.54 (URL), val 0.65 / 0.69
 (`results/zeroshot_v3_l6_v4*`). Then seeds 1, 2 (`m4_runs.sh 1`, `m4_runs.sh 2`) per the
 paper checklist (`09_paper_readiness.md`).
 
+**Seed 0 done (see `07_status.md`):** joint ≥ single for all three; http_attack unchanged or
+better; phishing_url beats TF-IDF (not length on PhishTrap); **prompt_injection is below
+TF-IDF out of domain** (held-out 0.766 vs 0.887, val 0.676 vs 0.740; one-pass threat-only
+0.861 / 0.749). Next, before more seeds:
+1. PI data diversity: longer, in-the-wild style prompts on both sides (benign role-play /
+   system prompts, long jailbreaks) from sources that are not held-out or val; check the
+   length shortcut stays low in training.
+2. Consider 2–3 epochs or a lower LR for URL (best epoch 1).
+3. Then seeds 1, 2 for the M4 comparison, and ONNX export of the chosen joint model.
+
 #### Original M3 note
 
 Verify the candidate datasets listed in `03_data.md` (existence, size, labels, licence),

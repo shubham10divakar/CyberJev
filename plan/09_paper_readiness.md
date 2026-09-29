@@ -9,8 +9,8 @@ Status: ✅ done · ⚠️ partial · ❌ not started
 
 | # | Needed | Status | Notes |
 |---|---|---|---|
-| 1 | Model for all three decisions (M4, joint) | ❌ → in progress | data v4, 6-layer from Nano-Jev v0.1 |
-| 2 | Joint vs single-decision models | ❌ → in progress | http single = v3-l6; train single PI and URL; bar: joint within ~1 point |
+| 1 | Model for all three decisions (M4, joint) | ⚠️ seed 0 | `v4-l6`: http ✅, URL ✅ (beats TF-IDF), **PI below TF-IDF out of domain** |
+| 2 | Joint vs single-decision models | ⚠️ seed 0 | joint ≥ single (PI +0.05 / +0.12); needs seeds |
 | 3 | ≥ 3 seeds per setup, mean ± std | ⚠️ | 2 seeds for http (v2-l6, v3-l6); held-out varies a lot (AUROC 0.905–0.953, DR@1%FPR 0.03–0.82) |
 | 4 | Baselines: TF-IDF + LR, length only | ✅ | `results/tfidf*`, `results/length_v4*` |
 | 5 | Baseline: plain fine-tuned classifier, same backbone, no question / option text | ❌ | shows whether the typed-decision format helps |
@@ -24,6 +24,8 @@ Status: ✅ done · ⚠️ partial · ❌ not started
 | 13 | Dataset hygiene findings as a contribution (duplicated / shortcut-laden public sets) | ⚠️ | findings in `03_data.md`; needs a table |
 | 14 | Release weights / code for reproducibility | ❌ | only when asked (M7) |
 
-Order: M4 (1, 2) → seeds (3) → baselines (5, 6) → calibration and triage (8, 9) → write.
+Blocking for a paper now: **prompt_injection out of domain** (below TF-IDF). Fix data first.
+
+Order: M4 (1, 2) → PI data diversity → seeds (3) → baselines (5, 6) → calibration and triage (8, 9) → write.
 After 9 it's enough for a workshop paper; a main-conference paper also needs 5 and 6 to hold
 up clearly out of domain.
