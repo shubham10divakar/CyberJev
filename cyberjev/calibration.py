@@ -26,6 +26,32 @@ def fit_temperature(logits: torch.Tensor, labels: torch.Tensor) -> float:
         return t if nll(t) < nll(1.0) else 1.0
 
 
+def fit_threat_only(z: torch.Tensor, labels: torch.Tensor) -> tuple[float, float]:
+    """Fit (T, b) so that P(threat) = sigmoid((z - b) / T) for one threat-option logit z
+    per example (Platt scaling). T is kept in [0.05, 20], like fit_temperature."""
+    z, y = z.float(), labels.float()
+    log_t = torch.zeros(1, requires_grad=True)
+    b = torch.tensor([float(z.median())], requires_grad=True)
+    opt = torch.optim.LBFGS([log_t, b], lr=1.0, max_iter=200, line_search_fn="strong_wolfe")
+
+    def closure():
+        opt.zero_grad()
+        loss = torch.nn.functional.binary_cross_entropy_with_logits(
+            (z - b) / log_t.clamp(-3.0, 3.0).exp(), y)
+        loss.backward()
+        return loss
+
+    opt.step(closure)
+    return float(log_t.detach().clamp(-3.0, 3.0).exp()), float(b.detach())
+
+
+def threat_only_logits(z: torch.Tensor, b: float) -> torch.Tensor:
+    """[n, 2] logits whose softmax at temperature T is (1 - p, p), p = sigmoid((z - b) / T),
+    so `metrics(threat_only_logits(z, b), labels, T)` scores the one-pass path."""
+    z = z.float()
+    return torch.stack([torch.zeros_like(z), z - b], dim=1)
+
+
 def ece(probs: np.ndarray, labels: np.ndarray, n_bins: int = 15) -> float:
     """Expected calibration error of the top-label confidence."""
     conf = probs.max(1)

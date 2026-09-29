@@ -3,7 +3,8 @@ import torch
 
 pytest.importorskip("sklearn")  # calibration metrics need the `train` extra
 
-from cyberjev.calibration import detection_rate, ece, fit_temperature, metrics  # noqa: E402
+from cyberjev.calibration import (detection_rate, ece, fit_temperature,  # noqa: E402
+                                  fit_threat_only, metrics, threat_only_logits)
 
 
 def test_fit_temperature_recovers_known_temperature():
@@ -50,3 +51,14 @@ def test_metrics_include_security_view_for_binary():
     logits = torch.tensor([[0.0, 3.0], [0.0, -3.0]] * 50)
     m = metrics(logits, torch.tensor([1, 0] * 50))
     assert m["auroc"] == 1.0 and m["dr_at_1pct_fpr"] == 1.0
+
+
+def test_fit_threat_only_recovers_known_shift_and_temperature():
+    # Labels are sampled from sigmoid((z - 1.5) / 2), so the fit should find T ~ 2, b ~ 1.5.
+    torch.manual_seed(0)
+    z = torch.randn(40000) * 4
+    labels = torch.bernoulli(torch.sigmoid((z - 1.5) / 2.0)).long()
+    t, b = fit_threat_only(z, labels)
+    assert t == pytest.approx(2.0, rel=0.1) and b == pytest.approx(1.5, abs=0.2)
+    probs = torch.softmax(threat_only_logits(z, b) / t, dim=1)[:, 1]
+    assert torch.allclose(probs, torch.sigmoid((z - b) / t), atol=1e-6)
