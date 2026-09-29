@@ -45,6 +45,18 @@ data_heldout/test.jsonl 10320  sqli-queries 6000 (attack 36%) · dvwa-juiceshop 
 No text occurs in more than one split; held-out examples that match any in-domain text
 are dropped.
 
+### Benign SQL candidates (for step 3, checked 2026-09-29 from Hub metadata only)
+
+| Dataset | Licence | Size | Notes |
+|---|---|---|---|
+| `gretelai/synthetic_text_to_sql` | Apache-2.0 | 100k+ | synthetic; varied SQL incl. INSERT / UPDATE / DDL. Candidate for **training** benign SQL |
+| `xlangai/spider` | CC-BY-SA-4.0 | ~8k train + 1k val | human-written queries over 200 DBs. Candidate for the **out-of-domain validation** set |
+| `b-mc2/sql-create-context` | CC-BY-4.0 | ~78k | built from WikiSQL + Spider: don't use it next to Spider (overlap) |
+| `Salesforce/wikisql` | unknown | ~80k | loading script only, no licence: skip |
+
+Not downloaded yet: check columns, query styles and overlap with `zrmarine/sql_injection`
+(held-out) before use.
+
 ### Other decisions
 
 | Decision | In-domain | Held-out |
