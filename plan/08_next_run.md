@@ -154,3 +154,13 @@ Then 3 seeds for the better one if it beats v5-l6 on val (v5: PI val 0.799 ± 0.
 **Done: neither helps** (PI val 0.787 / 0.808 vs 0.813 at seed 0; held-out 0.828 / 0.799).
 Truncation is not the bottleneck; keep head / 256. Remaining PI ideas: a multilingual or
 larger backbone, a TF-IDF + model ensemble, or report PI as a limitation.
+
+### 8. Decision (2026-09-29): PI is a reported limitation; paper items next
+
+Working joint model: `runs/cyber-jev-v5-l6` (data v5; seeds s1, s2 exist). Next, in order:
+1. ONNX int8 export + per-decision calibration + CPU latency for v5-l6 (onnx_cpu.py needs a
+   per-decision loop for the joint model).
+2. Plain fine-tuned classifier baseline (same 6-layer backbone, input text only, no
+   question / option), one per decision, 3 seeds (paper item 5).
+3. Calibration and triage analysis: reliability diagrams and block / review / allow
+   trade-off per decision (paper items 8, 9).

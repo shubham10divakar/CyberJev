@@ -24,7 +24,7 @@ Status: ✅ done · ⚠️ partial · ❌ not started
 | 13 | Dataset hygiene findings as a contribution (duplicated / shortcut-laden public sets) | ⚠️ | findings in `03_data.md`; needs a table |
 | 14 | Release weights / code for reproducibility | ❌ | only when asked (M7) |
 
-Blocking for a paper now: **prompt_injection** is at best level with TF-IDF (val) and below it on held-out, over 3 seeds. Either improve it further or frame the paper around http_attack + phishing_url with PI as a reported limitation.
+**Decision (2026-09-29, user): frame the paper around http_attack + phishing_url; report prompt_injection as a limitation** (level with TF-IDF on val, below on held-out over 3 seeds; data v5/v6 and truncation fixes tried, see `07_status.md`). Optional side experiment: a multilingual backbone for PI.
 
 Order: M4 (1, 2) → PI data diversity → seeds (3) → baselines (5, 6) → calibration and triage (8, 9) → write.
 After 9 it's enough for a workshop paper; a main-conference paper also needs 5 and 6 to hold
