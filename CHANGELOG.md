@@ -15,3 +15,8 @@
 - Metrics add AUROC and detection rate at 1% / 0.1% false-positive rate.
 - `scripts/baselines.py` is now a TF-IDF + logistic-regression baseline;
   new `scripts/bench_latency.py`.
+- One encoder pass for built-in binary decisions: when the model folder has `one_pass.json`
+  (written by `scripts/single_pass.py --save`), the Decider scores one option and returns
+  `sigmoid((sign·z − shift) / T)`; custom option sets still score every option. New
+  `fit_threat_only` in `cyberjev.calibration`. `bench_latency.py --two-pass` and
+  `onnx_cpu.py --one-pass` compare the two paths.
