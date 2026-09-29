@@ -85,6 +85,14 @@ Next: M4, train one 6-layer model on all three decisions (data v4), evaluate eac
 in-domain / held-out / val against its shortcut baselines (length, TF-IDF), and check
 http_attack doesn't get worse than v3-l6.
 
+### 5. M4 (started 2026-09-29): `bash scripts/m4_runs.sh [seed]`
+
+Joint `runs/cyber-jev-v4-l6` (all decisions) vs single-decision `v4-l6-pi`, `v4-l6-url`
+(http single = v3-l6). Results: `results/cyberjev_v4_l6*`. Zero-shot v3-l6 on the new
+decisions for reference: held-out AUROC 0.49 (PI) / 0.54 (URL), val 0.65 / 0.69
+(`results/zeroshot_v3_l6_v4*`). Then seeds 1, 2 (`m4_runs.sh 1`, `m4_runs.sh 2`) per the
+paper checklist (`09_paper_readiness.md`).
+
 #### Original M3 note
 
 Verify the candidate datasets listed in `03_data.md` (existence, size, labels, licence),
