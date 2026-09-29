@@ -83,3 +83,27 @@ def test_normalize_full_request_drops_boilerplate_keeps_payload_headers():
 
 def test_normalize_bare_payload_is_only_decoded():
     assert normalize_http("<svg onload=alert(1)>\n%27") == "<svg onload=alert(1)>\n'"
+
+
+def test_one_pass_scores_threat_option_alone(decider):
+    import torch
+    from cyberjev import model as M
+
+    fast = {"option": 1, "sign": 1.0, "temperature": 2.0, "shift": 0.5}
+    decider.one_pass = {"http_attack": fast}
+    try:
+        probs = decider.http_attack(REQUESTS[0])
+        assert_distribution(probs, ["safe", "attack"])
+        state = normalize_http(REQUESTS[0])
+        z = M.score(decider.model, decider.tok, [{"question": cyberjev.DECISIONS[
+            "http_attack"].question, "options": ["attack"], "state": state}],
+            decider.max_length, decider.device)[0][0]
+        assert probs["attack"] == pytest.approx(float(torch.sigmoid((z - 0.5) / 2.0)), abs=1e-5)
+        # Mixed batches keep order; custom option sets still score every option.
+        custom = {"question": "Which?", "options": ["sqli", "xss", "other"], "state": state}
+        out = decider.decide_many([custom, {"decision": "http_attack", "question": cyberjev.DECISIONS[
+            "http_attack"].question, "options": ["safe", "attack"], "state": state}])
+        assert_distribution(out[0], ["sqli", "xss", "other"])
+        assert out[1]["attack"] == pytest.approx(probs["attack"], abs=1e-4)
+    finally:
+        decider.one_pass = {}
