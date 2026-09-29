@@ -25,3 +25,11 @@ def test_waf_v2_request_is_normalized_like_other_requests():
     assert _waf_v2_text(row) == ("POST /submit?q=' or 1=1 HTTP/1.1\nHost: localhost:8080\n"
                                  "User-Agent: x\nbody: a=<b>")
     assert _waf_v2_text({**row, "method": "GET", "body": "None"}).endswith("User-Agent: x")
+
+
+def test_normalize_url_drops_scheme_and_trailing_slash():
+    from cyberjev.schema import normalize_url, url_host
+    assert normalize_url(" https://www.Example.com/login/ ") == "www.Example.com/login"
+    assert normalize_url("http://mourl.xyz/") == normalize_url("mourl.xyz") == "mourl.xyz"
+    assert url_host("https://user@www.Example.com:8080/a?b=1") == "example.com"
+    assert url_host("evil.com?x=http://good.com") == "evil.com"

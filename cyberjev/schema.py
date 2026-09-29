@@ -74,3 +74,22 @@ def normalize_http(request: str) -> str:
     if body.strip():
         lines.append(f"body: {body}")
     return unquote_plus("\n".join(lines))
+
+
+_SCHEME = re.compile(r"^[a-z][a-z0-9+.-]*://", re.I)
+
+
+def normalize_url(url: str) -> str:
+    """Canonical text for a URL. Training data and inference both go through this.
+
+    Drops the scheme and trailing slashes: URL datasets add or omit "http://" and "/"
+    wholesale, so keeping them would let a model learn which dataset a URL came from.
+    """
+    return _SCHEME.sub("", url.strip()).rstrip("/")
+
+
+def url_host(url: str) -> str:
+    """Lower-cased host of a URL (no port, no "www."), for keeping domains out of two splits."""
+    host = normalize_url(url).split("/", 1)[0].split("?", 1)[0].split("#", 1)[0]
+    host = host.rsplit("@", 1)[-1].split(":", 1)[0].lower()
+    return host.removeprefix("www.")

@@ -7,7 +7,7 @@ import torch
 
 from . import model as M
 from . import onnx_backend, registry
-from .schema import DECISIONS, normalize_http
+from .schema import DECISIONS, normalize_http, normalize_url
 
 
 def _read_json(folder: Path, name: str, stem: str | None) -> dict:
@@ -143,4 +143,7 @@ class Decider:
         return self._builtin("prompt_injection", text)
 
     def phishing_url(self, url: str | list[str]):
-        return self._builtin("phishing_url", url)
+        """url: with or without scheme; scheme and trailing "/" are dropped before scoring."""
+        if isinstance(url, str):
+            return self._builtin("phishing_url", normalize_url(url))
+        return self._builtin("phishing_url", [normalize_url(u) for u in url])

@@ -3,6 +3,7 @@
     python scripts/prepare_data.py --preset default
         # -> data/{train,calib,test}.jsonl, data_heldout/test.jsonl, data_val/val.jsonl
     python scripts/prepare_data.py --preset v2 --out data_v2   # data v2 exactly (no SQL, no val)
+    python scripts/prepare_data.py --preset v3 --out data_v3   # data v3: http_attack only
 
 Both are built in one run so held-out examples that also occur in training can be dropped.
 """
@@ -28,11 +29,21 @@ PRESETS = {
                sqli_heldout=6000, reqs_heldout=6000),
 }
 # v3 = v2 + benign SQL (gretel) in train / calib / test + the out-of-domain validation set.
-PRESETS["default"] = PRESETS["v3"] = dict(
-    PRESETS["v2"], sql_train=3000, sql_calib=200, sql_test=500,
-    val_waf_per_class=750, val_spider=1034)
+PRESETS["v3"] = dict(PRESETS["v2"], sql_train=3000, sql_calib=200, sql_test=500,
+                     val_waf_per_class=750, val_spider=1034)
+# v4 = v3 + prompt_injection and phishing_url (M3); http_attack examples are unchanged.
+PRESETS["default"] = PRESETS["v4"] = dict(
+    PRESETS["v3"],
+    pi_slabs_train=6000, pi_slabs_calib=400, pi_slabs_test=1000,
+    pi_neural_train=5000, pi_neural_calib=400, pi_neural_test=900, pi_val_per_class=750,
+    url_train_per_cell=2500, url_calib_per_cell=200, url_test_per_cell=500,
+    url_phishtrap_per_class=1500, url_destroylist=2000, url_val_per_cell=750)
 PRESETS["smoke"].update(sql_train=100, sql_calib=50, sql_test=50,
-                        val_waf_per_class=50, val_spider=100)
+                        val_waf_per_class=50, val_spider=100,
+                        pi_slabs_train=200, pi_slabs_calib=50, pi_slabs_test=50,
+                        pi_neural_train=200, pi_neural_calib=50, pi_neural_test=50, pi_val_per_class=50,
+                        url_train_per_cell=100, url_calib_per_cell=20, url_test_per_cell=20,
+                        url_phishtrap_per_class=50, url_destroylist=50, url_val_per_cell=20)
 
 
 def write(path: Path, examples: list[dict]):
@@ -42,6 +53,7 @@ def write(path: Path, examples: list[dict]):
             f.write(json.dumps(ex, ensure_ascii=False) + "\n")
     counts = Counter((ex["source"].split("/")[0], ex["options"][ex["label"]]) for ex in examples)
     print(f"{path}: {len(examples)} examples")
+    print(f"    by decision: {dict(Counter(ex['decision'] for ex in examples))}")
     for (src, lab), c in sorted(counts.items()):
         print(f"    {src:<16} {lab:<8} {c}")
 
