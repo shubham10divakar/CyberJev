@@ -17,3 +17,6 @@ Thumbs.db
 dist/
 *.egg-info/
 .pytest_cache/
+
+# Rebuilt data folders for older data versions (python scripts/prepare_data.py --preset vN --out data_vN)
+data_v[0-9]*/
