@@ -1,4 +1,4 @@
-# 08 — Next run (written 2026-09-28)
+# 08 — Next run (written 2026-09-28, updated 2026-09-29)
 
 Start here. Full numbers are in `07_status.md`; data details in `03_data.md`.
 
@@ -9,7 +9,8 @@ Start here. Full numbers are in `07_status.md`; data details in `03_data.md`.
   In-domain AUROC 0.995, held-out AUROC 0.953. Also has `model.onnx` and `model.int8.onnx`.
 - `runs/cyber-jev-v2` (12 layers, from Nano-Jev v1.0): same in-domain, worse held-out (0.881).
 - `runs/cyber-jev-dev`: the M1 model (CSIC only); kept only for comparison.
-- CPU latency (8 threads, batch 1, median): PyTorch 12.7 ms, ONNX int8 **8.1 ms**. Target ≤ 5 ms.
+- CPU latency (8 threads, batch 1, median), one pass: PyTorch 8.7 ms, ONNX int8 **4.2 ms**
+  (two passes: 12.7 / 8.1). Target ≤ 5 ms met with ONNX int8. `one_pass.json` is in the run folder.
 - Weights are in `runs/` (git-ignored, local only). Nothing is pushed to HF or PyPI.
 - `data/` and `data_heldout/` are committed; rebuild with `python scripts/prepare_data.py`.
 
@@ -29,23 +30,18 @@ browser open). Enough for everything planned; the models are small (22M paramete
 
 ## Next steps, in order
 
-### 1. One encoder pass per binary decision (latency, the main lever)
+### 1. ✅ One encoder pass per binary decision (done 2026-09-29, option b)
 
-Each decision now scores both options, i.e. two encoder passes, then softmaxes the two
-logits. For binary decisions this doubles the cost.
+Inference-only: `scripts/single_pass.py --save` writes `one_pass.json`; the Decider uses it.
+ONNX int8 CPU median **4.2 ms** (target ≤ 5), held-out AUROC 0.945–0.950 vs 0.953. Details in
+`07_status.md`. Left open:
 
-Options to try (pick by accuracy at equal latency):
-
-- **(a) Threat-option only.** Score only (question + "attack", state) → logit z; probability
-  = sigmoid(z − b), with b fitted on calib alongside the temperature. Needs a short
-  fine-tune with a binary loss on the threat option only, so z alone is meaningful.
-- **(b) Inference-only shortcut, no retraining.** Score only the threat option and use
-  sigmoid((z − b) / T), with b and T fitted on calib. Cheap to test first: if AUROC holds, done.
-- Keep the two-option path for custom option sets. The fast path is only for built-in
-  binary decisions (`http_attack`, `prompt_injection`, `phishing_url`).
-
-Done when: CPU int8 median ≤ 5 ms with held-out AUROC within ~0.01 of 0.953. Measure with
-`scripts/bench_latency.py` and `scripts/onnx_cpu.py`; both need the fast path added.
+- **Threat-only vs safe-only.** Calib NLL picked threat-only; safe-only is better on every
+  held-out metric (AUROC 0.958, DR@1%FPR 0.572). Settle it with step 2's second seed and/or a
+  separate out-of-domain *validation* set, not the held-out test.
+- **Decider on ONNX.** The ≤ 5 ms is ONNX int8 in `onnx_cpu.py`; the Decider still runs
+  PyTorch (9.6 ms CPU). Add an ONNX int8 backend to the Decider (load `model.int8.onnx` when
+  present, `onnxruntime` as an optional extra).
 
 ### 2. Second seed
 

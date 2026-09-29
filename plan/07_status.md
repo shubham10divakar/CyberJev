@@ -157,3 +157,41 @@ Next:
 2. **Second seed** for v2 vs v2-l6 before relying on the 6-layer model's held-out lead.
 3. **Hard benign negatives** (SQL-like text, code snippets) to cut off-domain false alarms.
 4. Then M3 (prompt_injection, phishing_url).
+
+## M2 step 4 — one encoder pass per binary decision (2026-09-29)
+
+Inference only, no retraining. `scripts/single_pass.py` scores both options once and
+compares the two-pass softmax with one-pass `sigmoid((s·z − b) / T)`, b and T fitted on
+calib, for the threat option (s = +1) and the safe option (s = −1). The variant is picked
+by **calib NLL**, never by test results; `--save` writes it to `<model>/one_pass.json`,
+which the Decider then uses for built-in decisions asked with their own two options.
+`results/single_pass_v2_l6.md` (full test sets, GPU):
+
+| test set | variant | calib NLL | AUROC | DR@1%FPR | NLL | ECE |
+|---|---|---|---|---|---|---|
+| in-domain | two-pass | 0.084 | 0.995 | 0.968 | 0.077 | 0.003 |
+| in-domain | threat-only (picked) | 0.099 | 0.990 | 0.968 | 0.091 | 0.003 |
+| in-domain | safe-only | 0.110 | 0.995 | 0.968 | 0.096 | 0.010 |
+| held-out | two-pass | 0.084 | 0.953 | 0.457 | 0.680 | 0.145 |
+| held-out | threat-only (picked) | 0.099 | 0.945 | 0.393 | 0.640 | 0.148 |
+| held-out | safe-only | 0.110 | **0.958** | **0.572** | **0.399** | **0.100** |
+
+Calib NLL picks threat-only, which is within the 0.01 AUROC budget held-out (0.945 vs
+0.953) but loses DR@1%FPR (0.457 → 0.393). Safe-only is better held-out on every metric
+(and cuts FPR@0.5: dvwa-juiceshop 0.21 → 0.11, sqli-queries 0.41 → 0.32), but choosing it
+from these numbers would be selecting on the test set. Decide with a second seed or a
+separate out-of-domain validation set.
+
+CPU latency, one pass (`results/onnx_v2_l6_one_pass.md`, 8 threads, held-out sample 3000;
+compare with the two-pass table above):
+
+| variant | in-domain AUROC | held-out AUROC | held-out DR@1%FPR | median ms | p95 ms |
+|---|---|---|---|---|---|
+| PyTorch fp32 | 0.990 | 0.950 | 0.455 | 8.7 | 15.3 |
+| ONNX fp32 | 0.990 | 0.950 | 0.455 | 5.3 | 16.0 |
+| ONNX int8 | 0.989 | 0.950 | 0.477 | **4.2** | **13.2** |
+
+**The ≤ 5 ms CPU median is met with ONNX int8** (8.1 → 4.2 ms; p95 23.4 → 13.2 ms). On the
+same held-out sample the two-pass int8 AUROC was 0.960, so one pass costs 0.010 there.
+The Decider itself still runs PyTorch: `results/latency_v2-l6_one_pass.md` has CPU 14.3 →
+9.6 ms median, GPU batch 64 1.24 → 0.69 ms per decision.
