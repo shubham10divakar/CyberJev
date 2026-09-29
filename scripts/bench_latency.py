@@ -3,6 +3,7 @@
     python scripts/bench_latency.py --model runs/cyber-jev-dev
     python scripts/bench_latency.py --model runs/cyber-jev-dev --threads 1   # one CPU core
     python scripts/bench_latency.py --model runs/cyber-jev-v2 --max-length 128 --out results/latency_v2_128.md
+    python scripts/bench_latency.py --model runs/cyber-jev-v2-l6 --two-pass   # ignore one_pass.json
 
 Reports median and p95 ms for batch size 1 on CPU and GPU, and ms per decision when a
 batch of requests is scored together on GPU.
@@ -47,6 +48,8 @@ def main():
     ap.add_argument("--threads", type=int, help="CPU threads (default: torch's choice)")
     ap.add_argument("--max-length", type=int, help="override the model's max_length")
     ap.add_argument("--no-gpu", action="store_true")
+    ap.add_argument("--two-pass", action="store_true",
+                    help="score both options even if the model has one_pass.json")
     ap.add_argument("--out", help="also write the table to this .md file")
     args = ap.parse_args()
     if args.threads:
@@ -56,6 +59,7 @@ def main():
               if ex["decision"] == "http_attack"]
     states = random.Random(0).sample(states, min(args.n, len(states)))  # test.jsonl is grouped by source
     ml = f", max_length {args.max_length}" if args.max_length else ""
+    ml += ", two passes" if args.two_pass else ""
     lines = [f"## Latency — `{args.model}`{ml}, http_attack, {len(states)} requests", "",
              "| setting | median ms | p95 ms |", "|---|---|---|"]
 
@@ -64,6 +68,10 @@ def main():
         d = Decider.from_pretrained(args.model, device=device)
         if args.max_length:
             d.max_length = args.max_length
+        if args.two_pass:
+            d.one_pass = {}
+        elif device == "cpu":
+            lines[0] += ", one pass" if d.one_pass else ""
         label = f"CPU ({torch.get_num_threads()} threads)" if device == "cpu" else "GPU"
         lines.append(row(f"{label}, batch 1", timings(d.http_attack, states)))
         if device == "cuda":
