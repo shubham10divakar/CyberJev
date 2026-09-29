@@ -3,18 +3,22 @@
 > Jev-style decision model for security checks. Built on [Nano-Jev](https://github.com/shubham10divakar/nano-jev).
 > Independent; not affiliated with TypeSafe AI.
 
-**Status: alpha, not published.** Weights exist only as local training runs.
+**Status: alpha, research in progress.** Weights exist only as local training runs; a paper
+is in preparation (see [Citation](#citation)).
 
-A small (33M parameter) **calibrated decision model** for text-like security data. Give it
+A small (22M parameter, 6-layer) **calibrated decision model** for text-like security data. Give it
 an HTTP request, a prompt or a URL; it returns a **probability per option** in a few
 milliseconds. It never generates text.
 
 | Decision | Options | Input | Status |
 |---|---|---|---|
-| `http_attack` | safe / attack | request line + body | first dev run: good in-domain, fails on unseen sources (see plan/07) |
-| `prompt_injection` | safe / injection | text sent to an LLM | planned |
-| `phishing_url` | legitimate / phishing | URL | planned |
+| `http_attack` | safe / attack | request line + body | strong: held-out AUROC 0.96, val 0.92 (3 seeds) |
+| `prompt_injection` | safe / injection | text sent to an LLM | in progress: level with TF-IDF on val (0.80), below it on held-out |
+| `phishing_url` | legitimate / phishing | URL | beats TF-IDF: held-out 0.81 (vs 0.71), val 0.94 |
 | `decide` | your own | any | untrained |
+
+One joint model answers all three (`runs/cyber-jev-v5-l6`); on CPU with ONNX int8 a decision
+takes about 4 ms. Numbers and caveats: [`plan/07_status.md`](plan/07_status.md).
 
 **What it is for:** a second-stage check behind rules or a WAF, with calibrated
 probabilities so that "block above 0.9, review between 0.2 and 0.9" means something.
@@ -68,23 +72,40 @@ pytest
 The 6-layer base is Nano-Jev v0.1 (`../nano_jev/runs/nano-jev-v0.1`); the 12-layer
 `cyber-jev-v2` used Nano-Jev v1.0. Weights live in `runs/` (git-ignored).
 
-## Data (`http_attack` v2)
+## Data
 
-| | Source | Size |
-|---|---|---|
-| train / calib / test | CSIC 2010 ([`bridge4/CSIC2010_dataset_classification`](https://huggingface.co/datasets/bridge4/CSIC2010_dataset_classification)) | 6000 / 500 / 1500 |
-| train / calib / test | payloads ([`shengqin/web-attacks`](https://huggingface.co/datasets/shengqin/web-attacks)) | 6000 / 500 / 1500 |
-| train / calib / test | full requests, many hosts ([`notesbymuneeb/ai-waf-dataset`](https://huggingface.co/datasets/notesbymuneeb/ai-waf-dataset)) | 9550 / 600 / 1200 |
-| held-out | SQL queries and SQLi ([`zrmarine/sql_injection`](https://huggingface.co/datasets/zrmarine/sql_injection)) | 6000 |
-| held-out | DVWA + Juice Shop requests ([`vyykaaa/dataset-web-attack`](https://huggingface.co/datasets/vyykaaa/dataset-web-attack)) | 4320 |
-
-Details, text format and caveats: [`plan/03_data.md`](plan/03_data.md).
+`python scripts/prepare_data.py` downloads the public sources and builds the current data
+(v6): `data/` (train / calib / in-domain test), `data_heldout/` (out-of-domain test, never
+trained on) and `data_val/` (out-of-domain validation, only for choices). The built files
+are committed so results can be reproduced; they are derived from third-party datasets,
+each under its own licence. **Sources, licences and attribution: [`DATA.md`](DATA.md).**
+Details, checks and caveats: [`plan/03_data.md`](plan/03_data.md).
 
 ## Results
 
 See [`results/`](results/) and [`plan/07_status.md`](plan/07_status.md).
 
+## Citation
+
+A paper describing Cyber-Jev (the typed-decision model, the out-of-domain evaluation and the
+dataset-hygiene findings) is **in progress**. If you use this code, the built data or the
+results, please cite it; until it is out, cite this repository:
+
+```bibtex
+@misc{cyberjev2026,
+  title  = {Cyber-Jev: a small calibrated decision model for application-layer security checks},
+  author = {Subham},
+  year   = {2026},
+  note   = {Paper in preparation. Code and data: https://github.com/shubham10divakar/CyberJev}
+}
+```
+
+<!-- Paper reference goes here once available: venue, arXiv id, BibTeX. -->
+*Paper: to be added.*
+
+Please also cite the original datasets you use (listed in [`DATA.md`](DATA.md)).
+
 ## Licence
 
-Code Apache-2.0 (copied from and adapted from Nano-Jev). Dataset licences are still to be
-checked before any weights are released.
+Code: Apache-2.0 (adapted from Nano-Jev). Built data in `data*/`: derived from third-party
+datasets that keep their own licences; see [`DATA.md`](DATA.md) before any use beyond research.
