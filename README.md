@@ -39,11 +39,17 @@ d.http_attack(["GET /a HTTP/1.1", "GET /b HTTP/1.1"])                    # many 
 
 Inputs are URL-decoded before scoring, the same way the training data was prepared.
 
+**Fast CPU inference.** With `pip install -e ".[onnx]"`, a Decider on CPU uses the model
+folder's `model.int8.onnx` (else `model.onnx`) instead of PyTorch: about 4.4 ms per
+`http_attack` decision on 8 threads vs 9.8 ms. Force a backend with
+`cyberjev.Decider.from_pretrained(path, backend="torch" | "onnx")`; `d.backend` shows which
+one is in use. When the folder has `one_pass.json`, built-in decisions need one encoder pass.
+
 ## Build, train, evaluate
 
 ```bash
 pip install -e ".[train,test]"
-pip install onnx onnxruntime                                  # only for scripts/onnx_cpu.py
+pip install -e ".[export]"                                    # only for scripts/onnx_cpu.py
 set PYTHONUTF8=1                                              # Windows console: tables use →
 
 python scripts/prepare_data.py            # data/{train,calib,test}.jsonl + data_heldout/test.jsonl
@@ -53,7 +59,9 @@ python scripts/evaluate.py --model runs/cyber-jev-v2-l6 --no-save --max-length 2
 python scripts/baselines.py                                   # TF-IDF + LR
 python scripts/baselines.py --test-data data_heldout --name tfidf_heldout
 python scripts/bench_latency.py --model runs/cyber-jev-v2-l6
-python scripts/onnx_cpu.py --model runs/cyber-jev-v2-l6 --out results/onnx_v2_l6.md
+python scripts/single_pass.py --model runs/cyber-jev-v2-l6 --save --out results/single_pass_v2_l6.md   # one_pass.json
+python scripts/onnx_cpu.py --model runs/cyber-jev-v2-l6 --save --out results/onnx_v2_l6.md
+python scripts/onnx_cpu.py --model runs/cyber-jev-v2-l6 --one-pass --save --out results/onnx_v2_l6_one_pass.md
 pytest
 ```
 

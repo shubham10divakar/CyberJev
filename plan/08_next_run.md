@@ -10,7 +10,8 @@ Start here. Full numbers are in `07_status.md`; data details in `03_data.md`.
 - `runs/cyber-jev-v2` (12 layers, from Nano-Jev v1.0): same in-domain, worse held-out (0.881).
 - `runs/cyber-jev-dev`: the M1 model (CSIC only); kept only for comparison.
 - CPU latency (8 threads, batch 1, median), one pass: PyTorch 8.7 ms, ONNX int8 **4.2 ms**
-  (two passes: 12.7 / 8.1). Target ≤ 5 ms met with ONNX int8. `one_pass.json` is in the run folder.
+  (two passes: 12.7 / 8.1). Target ≤ 5 ms met with ONNX int8; the Decider uses it on CPU (4.3–4.5 ms end to end).
+  `one_pass.json` and the ONNX calibration files are in the run folder.
 - Weights are in `runs/` (git-ignored, local only). Nothing is pushed to HF or PyPI.
 - `data/` and `data_heldout/` are committed; rebuild with `python scripts/prepare_data.py`.
 
@@ -39,9 +40,10 @@ ONNX int8 CPU median **4.2 ms** (target ≤ 5), held-out AUROC 0.945–0.950 vs 
 - **Threat-only vs safe-only.** Calib NLL picked threat-only; safe-only is better on every
   held-out metric (AUROC 0.958, DR@1%FPR 0.572). Settle it with step 2's second seed and/or a
   separate out-of-domain *validation* set, not the held-out test.
-- **Decider on ONNX.** The ≤ 5 ms is ONNX int8 in `onnx_cpu.py`; the Decider still runs
-  PyTorch (9.6 ms CPU). Add an ONNX int8 backend to the Decider (load `model.int8.onnx` when
-  present, `onnxruntime` as an optional extra).
+- ✅ **Decider on ONNX** (done 2026-09-29). On CPU the Decider now loads `model.int8.onnx`
+  with its own calibration (`one_pass.model.int8.json`): **4.3–4.5 ms** median over three
+  runs, p95 ~13 ms (PyTorch 9.8 ms). `results/latency_v2-l6_onnx.md`. Latency varies run to
+  run by up to ~1.5 ms with other programs open: one `onnx_cpu.py` rerun gave 5.6 ms.
 
 ### 2. Second seed
 

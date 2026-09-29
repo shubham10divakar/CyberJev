@@ -20,3 +20,7 @@
   `sigmoid((sign·z − shift) / T)`; custom option sets still score every option. New
   `fit_threat_only` in `cyberjev.calibration`. `bench_latency.py --two-pass` and
   `onnx_cpu.py --one-pass` compare the two paths.
+- ONNX Runtime backend: on CPU the Decider uses `model.int8.onnx` / `model.onnx` when present
+  and `onnxruntime` is installed (`backend="auto"`; also `"torch"`, `"onnx"`), with
+  calibration fitted on that file (`calibration.<file>.json`, `one_pass.<file>.json`, written
+  by `onnx_cpu.py --save`). New extras `onnx` and `export`.

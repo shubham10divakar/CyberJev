@@ -195,3 +195,13 @@ compare with the two-pass table above):
 same held-out sample the two-pass int8 AUROC was 0.960, so one pass costs 0.010 there.
 The Decider itself still runs PyTorch: `results/latency_v2-l6_one_pass.md` has CPU 14.3 →
 9.6 ms median, GPU batch 64 1.24 → 0.69 ms per decision.
+
+### ONNX backend in the Decider (2026-09-29)
+
+On CPU, `Decider.from_pretrained` now loads `model.int8.onnx` when `onnxruntime` is
+installed (`backend="auto"`), with calibration refitted on the int8 logits by
+`onnx_cpu.py --save` (`one_pass.model.int8.json`: T 1.26, b −3.25 vs PyTorch 1.32, −3.10).
+End to end, as a caller sees it (`results/latency_v2-l6_onnx.md`, 8 threads, batch 1):
+**4.3–4.5 ms** median over three runs, p95 12.7–13.8 ms; PyTorch 9.8 ms. The two-pass
+`onnx_cpu.py` rerun reproduced 8.0 ms; a one-pass rerun gave 5.6 ms int8 (vs 4.2 before)
+with identical accuracy, so single runs vary by up to ~1.5 ms with other programs open.
