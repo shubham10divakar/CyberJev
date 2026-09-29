@@ -531,3 +531,56 @@ PyTorch). **Decider, one pass, ONNX int8, CPU 8 threads, batch 1** (3 runs, medi
 All three meet ≤ 5 ms at the median. PI's p95 (~18 ms) comes from long prompts (256 tokens).
 One pass vs two on the 3000 held-out sample (int8): http 0.942 vs 0.958, URL 0.807 vs 0.815,
 PI 0.833 vs 0.822 — val picked these variants; the held-out cost for http is ~0.016.
+
+## Paper items 5, 8, 9: plain classifier baseline, calibration, triage (2026-09-29)
+
+### Plain classifier vs joint cross-encoder (3 seeds each, data v5)
+
+`scripts/train_plain.py`: same 6-layer backbone and recipe, **input text only** (no question /
+option), fresh 2-class head, one model per decision. `results/seeds_joint_vs_plain_v5.md`.
+AUROC mean ± std:
+
+| decision | set | joint v5-l6 | plain (per decision) |
+|---|---|---|---|
+| http_attack | held-out | 0.962 ± 0.009 | 0.964 ± 0.021 |
+| | val | 0.915 ± 0.022 | 0.905 ± 0.017 |
+| | FPR@0.5 dvwa / waf-v2 | **0.42 / 0.28** | 0.60 / 0.42 |
+| prompt_injection | held-out | **0.812 ± 0.026** | 0.760 ± 0.018 |
+| | val | **0.799 ± 0.015** | 0.748 ± 0.014 |
+| phishing_url | held-out | 0.808 ± 0.012 | **0.823 ± 0.005** |
+| | val | 0.944 ± 0.005 | 0.943 ± 0.002 |
+
+- **The typed-decision joint model clearly beats a plain classifier on prompt_injection**
+  (+0.05 held-out and val, > 2 std), ties on http_attack (with fewer false alarms at 0.5),
+  and is slightly behind on phishing_url held-out (−0.015). Caveat: joint vs plain changes
+  two things at once (question/option input and multi-task training); a single-decision
+  cross-encoder on v5 would separate them.
+
+### Calibration and triage (Decider path, one pass; 3 seeds)
+
+`scripts/calibration_report.py` → `results/calibration_v5_l6*.{md,json,png}` (reliability
+diagram and risk-coverage curve per decision). Policy: block ≥ 0.9, allow ≤ 0.2, else review.
+Mean over 3 seeds:
+
+| decision | set | ECE | reviewed | error on auto-decided | error, review 0% → 20% most uncertain |
+|---|---|---|---|---|---|
+| http_attack | in-domain | 0.024 | 11% | 1.1% | 4.2% → 0.5% |
+| | held-out | 0.106 | 15% | 8.9% | 14.9% → 8.3% |
+| | val | 0.102 | 20% | 12.1% | 16.1% → 11.4% |
+| phishing_url | in-domain | 0.027 | 22% | 4.0% | 10.2% → 4.3% |
+| | held-out | 0.121 | 38% | 18.0% | 25.1% → 20.0% |
+| | val | 0.062 | 23% | 6.7% | 13.3% → 8.1% |
+| prompt_injection | in-domain | 0.017 | 6% | 2.4% | 3.9% → 0.7% |
+| | held-out | 0.220 | 21% | 24.2% | 28.9% → 25.6% |
+| | val | 0.174 | 31% | 20.0% | 27.8% → 23.8% |
+
+- **Calibrated in domain, not out of domain.** In-domain ECE 0.02–0.03; out of domain
+  0.06–0.22. The temperature fitted on in-domain calib does not transfer: on http held-out
+  the model is over-confident about attacks (false blocks at 0.9: 13.8% of safe requests on
+  average, up to 22%), on http val it under-predicts them (missed threats 15.6%).
+- **Uncertainty still ranks errors out of domain:** sending the 20% most uncertain to review
+  roughly halves http errors (held-out 14.9 → 8.3%, val 16.1 → 11.4%) and URL val errors
+  (13.3 → 8.1%). For PI the gain is small (28.9 → 25.6%), consistent with PI being weak.
+- **Paper framing:** "calibrated probabilities" hold in domain; out of domain the probability
+  *ranking* supports triage but thresholds need recalibration on target-like data. Next test:
+  fit the calibration on `data_val` (out-of-domain, never test) and re-check held-out ECE.

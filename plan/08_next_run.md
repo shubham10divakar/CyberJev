@@ -160,7 +160,12 @@ larger backbone, a TF-IDF + model ensemble, or report PI as a limitation.
 Working joint model: `runs/cyber-jev-v5-l6` (data v5; seeds s1, s2 exist). Next, in order:
 1. ✅ ONNX int8 export + per-decision calibration + CPU latency for v5-l6: Decider medians
    3.8–4.1 ms (http), 2.3–2.5 ms (PI), 1.8–1.9 ms (URL). See `07_status.md`.
-2. Plain fine-tuned classifier baseline (same 6-layer backbone, input text only, no
-   question / option), one per decision, 3 seeds (paper item 5).
-3. Calibration and triage analysis: reliability diagrams and block / review / allow
-   trade-off per decision (paper items 8, 9).
+2. ✅ Plain classifier baseline (3 seeds): joint beats it on PI (+0.05), ties http, −0.015 URL.
+3. ✅ Calibration and triage (3 seeds): calibrated in domain (ECE 0.02–0.03), not out of domain
+   (0.06–0.22); reviewing the 20% most uncertain roughly halves http errors.
+
+### 9. Next (paper)
+
+- Recalibrate on `data_val` (out-of-domain) and re-check held-out ECE / false blocks.
+- Single-decision cross-encoder on v5 (3 seeds) to separate "question format" from "joint".
+- Item 6: one public detector per decision; item 13: dataset-hygiene table.
