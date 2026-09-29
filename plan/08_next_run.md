@@ -79,7 +79,13 @@ choices on (threat-only vs safe-only, thresholds). Add a small `data_val/` from 
 is neither training nor held-out, used only for such choices. Also look for a harder held-out
 web-request source: `dvwa-juiceshop` can be separated by path alone.
 
-### 4. Then M3: `prompt_injection` and `phishing_url`
+### 4. M3: `prompt_injection` and `phishing_url` (data ✅ 2026-09-29: data v4, see `03_data.md`)
+
+Next: M4, train one 6-layer model on all three decisions (data v4), evaluate each decision
+in-domain / held-out / val against its shortcut baselines (length, TF-IDF), and check
+http_attack doesn't get worse than v3-l6.
+
+#### Original M3 note
 
 Verify the candidate datasets listed in `03_data.md` (existence, size, labels, licence),
 add builders to `cyberjev/data.py`, and give each a held-out source from a different origin.

@@ -81,14 +81,64 @@ Checks done:
 - Also available, unused: `b-mc2/sql-create-context` (CC-BY-4.0, built from WikiSQL + Spider:
   don't use next to Spider), `Salesforce/wikisql` (no licence: skip).
 
-### Other decisions
+### Data v4 (M3, 2026-09-29): `prompt_injection` and `phishing_url`
 
-| Decision | In-domain | Held-out |
-|---|---|---|
-| `prompt_injection` | `deepset/prompt-injections`, `xTRam1/safe-guard-prompt-injection` (to verify) | `jackhhao/jailbreak-classification` (to verify) |
-| `phishing_url` | a malicious-URL set, e.g. `surajshelke/malicious_url` (to verify) | a second URL set from a different source (to pick) |
+`python scripts/prepare_data.py` (preset `default` = `v4`; `--preset v3` still builds v3).
+Each new decision has its own rng; http_attack examples are unchanged (checked).
+Held-out and val are built first; training drops anything they contain (for URLs: any
+URL on the same **host**, not just the same URL).
 
-"To verify" = check it exists, its size, its labels and its licence before use.
+#### `prompt_injection`
+
+| Role | Source | What it is | Size | License |
+|---|---|---|---|---|
+| train / calib / test | `S-Labs/prompt-injection-dataset` | direct injections, "reveal your guidelines" vs ordinary questions | 6000 / 400 / 1000 | MIT |
+| train / calib / test | `neuralchemy/Prompt-injection-dataset` (own grouped splits) | injections incl. HackAPrompt, encodings, jailbreaks, hard benign | 4390 / 400 / 900 | Apache-2.0 |
+| held-out | `deepset/prompt-injections` (all) | small, multilingual (en / de) | 662 | Apache-2.0 |
+| held-out | `jackhhao/jailbreak-classification` (all) | role-play jailbreaks vs benign role-play personas | 1289 | Apache-2.0 |
+| validation | `TrustAIRLab/in-the-wild-jailbreak-prompts` (2023-12-25) | in-the-wild jailbreak vs regular prompts, **length-matched** | 750 + 750 | MIT |
+
+Checks: `xTRam1/safe-guard-prompt-injection` and `jayavibhav/prompt-injection` (no licence)
+are aggregations (jayavibhav contains all of deepset; xTRam1 contains jackhhao and
+TrustAIRLab): not used. `reshabhs/SPML_Chatbot_Prompt_Injection` (MIT) rejected for val:
+its injections are the benign prompt plus an appended attack, so **length alone gives AUROC
+1.00**. TrustAIRLab is sampled with equal counts per length band (length-only AUROC 0.50).
+
+Length is a shortcut everywhere else (length-only AUROC): train 0.72–0.74, held-out deepset
+0.81, jackhhao 0.87 (jailbreaks median 1561 chars vs 232). Injections really are longer,
+but compare the model with this baseline. Held-out jailbreaks are longer than max_length
+256, so the model sees only their start.
+
+#### `phishing_url`
+
+| Role | Source | What it is | Size | License |
+|---|---|---|---|---|
+| train / calib / test | `flwrlabs/fed-phishing-urls` (train split → train / calib, test → test) | 1.1M merged URLs, legitimate / phishing | 10000 / 800 / 1998 | Apache-2.0 |
+| held-out | `saidutta69/PhishTrap` | Tranco top domains vs Phishing.Database, **collected Aug–Sep 2026** | 1500 + 1500 | MIT |
+| held-out | `phishdestroy/destroylist` `urls.txt` | phishing domains only (report DR) | 2000 | MIT |
+| validation | `JPxxx/url-benchmark-dataset` (300k sampled) | benign / malicious URLs | 3000 | Apache-2.0 |
+
+- **Format shortcut removed:** in flwrlabs, 70% of bare domains are phishing and 63% of
+  URLs with a path are legitimate. Train / calib / test / val take equal counts per label
+  within "has a path" and "bare domain".
+- **One URL format:** `normalize_url` drops the scheme and trailing `/` (datasets add
+  "http://" wholesale: PhishTrap on every row, JPxxx on none). `Decider.phishing_url` applies it.
+- **Merged sources:** flwrlabs contains nearly all of Mitake, alexkstern, kmack and
+  pirocheto (11064 of 11070); surajshelke (no licence) overlaps them all. None of those can
+  be held-out. JPxxx overlaps flwrlabs too (437k URLs), so val drops shared hosts.
+- Rejected: `Anvilogic/URL-Guardian-Dataset` (gated), `phl-ldm/tranco_top_million` (57 GB of
+  crawl data, not a domain list), `imanoop7/...` (looks synthetic), `Rishik001/...` (features only).
+- Shortcut baselines (AUROC): length 0.55 train, **0.86 PhishTrap**, 0.66 val; dot count 0.67
+  train, 0.71 PhishTrap, 0.76 val. PhishTrap benign are short popular domains, so length does
+  well there; the model must beat it.
+
+```
+data/train.jsonl        44940  http_attack 24550 · prompt_injection 10390 · phishing_url 10000
+data/calib.jsonl         3400  1800 · 800 · 800
+data/test.jsonl          8598  4700 · 1900 · 1998
+data_heldout/test.jsonl 17271  10320 · 1951 · 5000
+data_val/val.jsonl       8063  3563 · 1500 · 3000
+```
 
 ## Text format
 
