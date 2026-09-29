@@ -3,7 +3,7 @@ requires = ["hatchling>=1.27"]
 build-backend = "hatchling.build"
 
 [project]
-name = "cyber-jev"
+name = "codejev"
 dynamic = ["version"]
 description = "Tiny calibrated decision model for security checks: web attacks, prompt injection, phishing URLs"
 readme = "README.md"
@@ -41,12 +41,13 @@ export = ["onnxruntime>=1.17", "onnx"]
 test = ["pytest>=8"]
 
 [project.scripts]
+codejev = "cyberjev.__main__:main"
 cyber-jev = "cyberjev.__main__:main"
 
 [project.urls]
-Homepage = "https://github.com/shubham10divakar/cyber-jev"
-Repository = "https://github.com/shubham10divakar/cyber-jev"
-Issues = "https://github.com/shubham10divakar/cyber-jev/issues"
+Homepage = "https://github.com/shubham10divakar/CyberJev"
+Repository = "https://github.com/shubham10divakar/CyberJev"
+Issues = "https://github.com/shubham10divakar/CyberJev/issues"
 Model = "https://huggingface.co/sdmlai/cyber-jev"
 
 [tool.hatch.version]
@@ -60,7 +61,7 @@ core-metadata-version = "2.4"
 [tool.hatch.build.targets.sdist]
 core-metadata-version = "2.4"
 # Keep the source distribution small: no data/, results/ or training runs.
-include = ["cyberjev", "tests", "README.md", "CHANGELOG.md", "LICENSE", "pyproject.toml"]
+include = ["/cyberjev", "/tests", "/README.md", "/CHANGELOG.md", "/LICENSE", "/pyproject.toml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

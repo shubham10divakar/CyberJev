@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0 (2026-09-29)
+
+- First PyPI release as **`codejev`** (`pip install codejev`); the import name stays
+  `cyberjev`. Command `codejev` (`cyber-jev` still works).
+- Default weights `v0.1` are downloaded from Hugging Face (`sdmlai/cyber-jev`) on first use.
+
 ## Weights v0.1 (2026-09-29)
 
 - Published on Hugging Face: [`sdmlai/cyber-jev`](https://huggingface.co/sdmlai/cyber-jev),
@@ -7,7 +13,7 @@
   `phishing_url` (data v5, 6 layers, 22.7M parameters) with int8 ONNX and per-decision
   calibration; the package default `v0.1` now resolves to it.
 
-## 0.1.0.dev0 (unreleased)
+## 0.1.0.dev0
 
 - Forked from Nano-Jev 1.0.0: same model, calibration, registry and CLI; package renamed
   `cyberjev`, command `cyber-jev`, settings in `~/.cyberjev`, env vars `CYBERJEV_*`.
