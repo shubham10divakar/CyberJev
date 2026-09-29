@@ -296,3 +296,21 @@ By source, at the 0.5 threshold (FPR = safe flagged, DR = attacks caught):
 - **Working model: v3-l6 (seed 0)**, picked by val AUROC (0.909 vs 0.903), not by held-out.
 - One pass: val picks threat-only for both (v3-l6: 0.910 vs safe-only 0.893). Held-out again
   favoured safe-only (0.980 vs 0.928): the same split as with v2.
+
+### v3-l6 on ONNX (2026-09-29)
+
+`onnx_cpu.py --save` (two-pass and `--one-pass`) wrote `model.onnx`, `model.int8.onnx` and
+their calibration files into `runs/cyber-jev-v3-l6`. `results/onnx_v3_l6*.md`,
+`results/latency_v3-l6_onnx.md`:
+
+| path | in-domain AUROC | held-out AUROC (3000 sample) | median ms | p95 ms |
+|---|---|---|---|---|
+| two-pass, ONNX int8 | 0.997 | 0.951 | 7.05 | 22.8 |
+| one-pass, ONNX int8 | 0.995 | 0.934 | 3.90 | 13.6 |
+| **Decider, one-pass, ONNX int8** (3 runs) | | | **3.77–3.97** | 12.3–12.8 |
+| Decider, one-pass, PyTorch | | | 9.58 | 16.1 |
+
+int8 costs no accuracy. On val the int8 Decider scores AUROC 0.914 (PyTorch 0.910), waf-v2
+0.883, and still flags **0** Spider queries. Latency ≤ 5 ms holds with the v3 model.
+One-pass costs held-out AUROC here (0.934 vs 0.951 two-pass on the sample), within the
+noise seen across seeds, and val picked it.

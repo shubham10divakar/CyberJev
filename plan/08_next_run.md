@@ -10,7 +10,8 @@ Start here. Full numbers are in `07_status.md`; data details in `03_data.md`.
   In-domain AUROC 0.995, held-out AUROC 0.953. Also has `model.onnx` and `model.int8.onnx`.
 - `runs/cyber-jev-v2` (12 layers, from Nano-Jev v1.0): same in-domain, worse held-out (0.881).
 - `runs/cyber-jev-dev`: the M1 model (CSIC only); kept only for comparison.
-- CPU latency (8 threads, batch 1, median), one pass: PyTorch 8.7 ms, ONNX int8 **4.2 ms**
+- CPU latency (8 threads, batch 1, median), one pass, v3-l6: Decider on ONNX int8 **3.8–4.0 ms**
+  (v2-l6: 4.3–4.5); PyTorch 9.6 ms. v2-l6 via onnx_cpu.py: PyTorch 8.7 ms, ONNX int8 4.2 ms
   (two passes: 12.7 / 8.1). Target ≤ 5 ms met with ONNX int8; the Decider uses it on CPU (4.3–4.5 ms end to end).
   `one_pass.json` and the ONNX calibration files are in the run folder.
 - Weights are in `runs/` (git-ignored, local only). Nothing is pushed to HF or PyPI.
@@ -59,8 +60,9 @@ threat-only stays (`07_status.md`).
 
 Benign-SQL false alarms: Spider 0.55 → 0.00, held-out sqli-queries 0.41 → 0.20, SQLi detection
 unchanged; small cost on waf-v2 requests (AUROC 0.885 → 0.875). Details in `07_status.md`.
-Left open: export v3-l6 to ONNX (`onnx_cpu.py --save`, two-pass and `--one-pass`) and
-re-check CPU latency; look at why waf-v2 dropped (what normal requests are now flagged).
+✅ v3-l6 exported to ONNX with its own calibration: Decider **3.8–4.0 ms** CPU median,
+Spider false alarms still 0 on int8. Left open: look at why waf-v2 dropped (what normal
+requests are now flagged).
 
 ### 3 (original note)
 
