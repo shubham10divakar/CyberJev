@@ -17,6 +17,12 @@ AI_WAF = "notesbymuneeb/ai-waf-dataset"             # full HTTP requests, many h
 # Held-out sources: never trained on, only for final reporting.
 SQLI = "zrmarine/sql_injection"                     # SQL queries and payloads, 0 benign / 1 injection
 WEB_ATTACK_REQS = "vyykaaa/dataset-web-attack"      # DVWA + Juice Shop requests, normal / anomalous
+# Data v3 additions. Built with their own rng after the sources above, so v2's splits and the
+# held-out set stay byte-identical.
+GRETEL_SQL = "gretelai/synthetic_text_to_sql"       # benign SQL (training hard negatives), Apache-2.0
+# Validation sources: out-of-domain, never trained on or tested on; only for choices.
+WAF_V2 = "puyang2025/waf_data_v2"                   # full requests, normal / anomalous, MIT
+SPIDER = "xlangai/spider"                           # human-written SQL, all benign, CC-BY-SA-4.0
 
 
 def _example(decision: str, label: int, state: str, source: str) -> dict:
@@ -107,6 +113,57 @@ def http_attack_heldout(sizes: dict, rng: random.Random, exclude: set[str]) -> l
     return out
 
 
+def benign_sql_splits(sizes: dict, rng: random.Random, exclude: set[str]) -> dict[str, list]:
+    """Benign SQL labelled safe: train from gretel's train split, calib / test from its test split."""
+    out = {}
+    for split, names in [("train", ["train"]), ("test", ["calib", "test"])]:
+        rows = _dedup((normalize_http(r["sql"]), 0, f"gretel-sql/{r['sql_task_type']}")
+                      for r in load_dataset(GRETEL_SQL, split=split))
+        rows = [r for r in rows if r[0] not in exclude]
+        rng.shuffle(rows)
+        start = 0
+        for name in names:
+            n = sizes[f"sql_{name}"]
+            out[name], start = rows[start: start + n], start + n
+    return out
+
+
+def _waf_v2_text(r) -> str:
+    body = "" if r["body"] in (None, "None") else r["body"]
+    return normalize_http(f"{r['method']} {r['url']} {r['protocol']}\n{r['headers']}"
+                          + (f"\n\n{body}" if body.strip() else ""))
+
+
+def validation_set(sizes: dict, rng: random.Random, exclude: set[str]) -> list[tuple]:
+    """Out-of-domain validation: waf-v2 requests, balanced per class within each of its two
+    main hosts (so the Host header carries no label), and Spider dev queries (all safe)."""
+    import re
+
+    per = sizes["val_waf_per_class"]
+    ds = load_dataset(WAF_V2, split="test")
+    idx = list(range(len(ds)))
+    rng.shuffle(idx)
+    want = {(h, lab): per for h in ("test-site.com", "localhost:8080") for lab in (0, 1)}
+    rows, seen = [], set(exclude)
+    for i in idx:
+        if not any(want.values()):
+            break
+        r = ds[i]
+        host = re.search(r"^Host: (\S+)", r["headers"] or "", re.M)
+        key = (host.group(1) if host else "?", int(r["label"] == "anomalous"))
+        if want.get(key):
+            text = _waf_v2_text(r)
+            if text not in seen:
+                seen.add(text)
+                rows.append((text, key[1], f"waf-v2/{key[0]}"))
+                want[key] -= 1
+    spider = _dedup((normalize_http(r["query"]), 0, f"spider/{r['db_id']}")
+                    for r in load_dataset(SPIDER, split="validation"))
+    spider = [r for r in spider if r[0] not in seen]
+    rng.shuffle(spider)
+    return rows + spider[: sizes["val_spider"]]
+
+
 def _examples(rows):
     return [_example("http_attack", y, t, s) for t, y, s in rows]
 
@@ -117,5 +174,15 @@ def build_all(sizes: dict, seed: int = 0) -> dict[str, list[dict]]:
     splits = http_attack_splits(sizes, rng)
     exclude = {t for rows in splits.values() for t, _, _ in rows}
     splits["heldout"] = http_attack_heldout(sizes, rng, exclude)
+    # v3 sources: their own rng, and nothing that is already in any split (held-out included).
+    used = exclude | {t for t, _, _ in splits["heldout"]}
+    extra = random.Random(f"{seed}-v3")
+    if sizes.get("sql_train"):
+        sql = benign_sql_splits(sizes, extra, used)
+        for name, rows in sql.items():
+            splits[name] += rows
+            used |= {t for t, _, _ in rows}
+    if sizes.get("val_waf_per_class"):
+        splits["val"] = validation_set(sizes, extra, used)
     rng.shuffle(splits["train"])
     return {name: _examples(rows) for name, rows in splits.items()}

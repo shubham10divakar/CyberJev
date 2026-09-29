@@ -2,7 +2,7 @@ import pytest
 
 pytest.importorskip("datasets")  # data builders need the `train` extra
 
-from cyberjev.data import csic_to_text  # noqa: E402
+from cyberjev.data import _waf_v2_text, csic_to_text  # noqa: E402
 
 # In CSIC, headers are joined by a literal backslash-n; only the body follows a real newline.
 
@@ -17,3 +17,11 @@ def test_csic_post_keeps_body():
     raw = (r"POST /tienda1/publico/vaciar.jsp HTTP/1.1\nUser-Agent: Mozilla/5.0"
            r"\nContent-Length: 17" "\nB2=Vaciar+carrito")
     assert csic_to_text(raw) == "POST /tienda1/publico/vaciar.jsp HTTP/1.1\nbody: B2=Vaciar carrito"
+
+
+def test_waf_v2_request_is_normalized_like_other_requests():
+    row = {"method": "POST", "url": "/submit?q=%27+or+1%3D1", "protocol": "HTTP/1.1",
+           "headers": "Host: localhost:8080\r\nAccept: */*\r\nUser-Agent: x", "body": "a=%3Cb%3E"}
+    assert _waf_v2_text(row) == ("POST /submit?q=' or 1=1 HTTP/1.1\nHost: localhost:8080\n"
+                                 "User-Agent: x\nbody: a=<b>")
+    assert _waf_v2_text({**row, "method": "GET", "body": "None"}).endswith("User-Agent: x")
