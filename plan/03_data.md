@@ -144,6 +144,37 @@ train / calib / test:
 - **Not available yet:** the full `allenai/wildjailbreak` (262k train, adversarial harmful
   and benign) is gated; access needs the account owner to accept its terms on the website.
 
+#### Data v6 (2026-09-29): short, non-English `prompt_injection` prompts
+
+Why: after v5, held-out deepset fell (0.835 → 0.747). deepset is short (median ~60 chars) and
+partly German; all v5 additions were long and English.
+
+`prompt_injection_multi` (preset `v6` = default) adds 2736 prompts (2327 / 136 / 273 to
+train / calib / test):
+
+| Side | Source | License | In v6 |
+|---|---|---|---|
+| injection | `yanismiraoui/prompt_injections` (pt / de / fr / es / it / ro / en) | Apache-2.0 | 926 |
+| injection | `dmtrdr/russian_prompt_injections` `prompt_ru` (rows from jackhhao dropped) | Apache-2.0 | ~580 |
+| safe | MKQA questions de / fr / es / it / pt / ru via `mteb/MKQARetrieval` | CC-BY-3.0 | ~1368 |
+
+- **Script- and length-matched:** two groups (Latin: de/fr/es/it/pt; Cyrillic: ru), each with
+  equal counts per label in fine length bands (15–800 chars). Length-only AUROC 0.505,
+  Cyrillic flag 0.497.
+- MKQA is (nearly) parallel across languages with per-language ids, so each language takes a
+  contiguous block of rows: the same question never appears in two languages.
+- **Rejected:** `rikka-snow/prompt-injection-multilingual` = deepset + translations (662 exact
+  and ~3000 near copies of held-out). `dmtrdr` rows translated from jackhhao (1168) dropped;
+  its other sources (Mosscap, SaladBench, JailBreakV, Aegis, disaster tweets) kept.
+  `darkknight25/Multilingual_Jailbreak_Dataset` is harmful requests, not injections.
+  `deepset/germanquad`, `apple/mkqa`: loading scripts, no longer supported.
+- **Caveat:** a translation of a held-out prompt can't be caught by character matching.
+  yanismiraoui states "original" and shares no exact or near copy with deepset.
+
+**Reproducibility fix:** `phishdestroy/destroylist` syncs hourly, so a rebuild changed 1063
+held-out destroylist URLs and, via host exclusion, 3085 flwrlabs training rows. Pinned to
+revision `42163edf` (2026-09-29 06:30 UTC), which reproduces the committed data exactly.
+
 #### `phishing_url`
 
 | Role | Source | What it is | Size | License |
