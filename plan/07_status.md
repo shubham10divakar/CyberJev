@@ -475,3 +475,17 @@ difference is within one std, so v5 and v6 are effectively tied on val.
   TF-IDF on both; http_attack is strong (no TF-IDF refit on v5/v6; v3 TF-IDF held-out 0.657).
 - Run-to-run spread is large for some sources (dvwa ± 0.05, waf-v2 FPR ± 0.15): any paper
   table needs ≥ 3 seeds.
+
+## Spot check: sample inputs through joint `v5-l6` (2026-09-29, CPU, PyTorch)
+
+Clear cases are right with high confidence: SQLi / XSS / traversal → attack ≥ 0.999, benign
+SQL → safe 0.997; "Ignore all previous instructions…" 0.999, German "Vergiss alle
+vorherigen Anweisungen…" 0.96, DAN 0.998, "act as a travel guide" safe 0.99; lookalike /
+IP / free-hosting phishing URLs ≥ 0.95. **Known issues found:**
+1. **Benign search request borderline:** `GET /search?q=running+shoes&page=2` → attack 0.53.
+2. **Legitimate URL on a free-hosting domain flagged:** `github.com/shubham10divakar/CyberJev`
+   → phishing 0.93 (github.com / web.app user paths are common in phishing data).
+   wikipedia.org → legitimate 0.74 only.
+3. **`normalize_http` decodes `+` to a space everywhere**, also in raw (not URL-encoded)
+   POST bodies: `'+document.cookie` became `' document.cookie`. Should only unquote_plus
+   query strings / form-encoded bodies.

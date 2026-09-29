@@ -138,6 +138,12 @@ add builders to `cyberjev/data.py`, and give each a held-out source from a diffe
 - max_length 128 was tested and rejected (it truncates payloads in full requests).
 - p95 latency (~23 ms) is set by long requests. After step 1, look at the p95 again.
 
+### Known issues from the spot check (see `07_status.md`)
+
+- Benign search request at attack 0.53; github.com user-repo URL at phishing 0.93.
+- `normalize_http` turns `+` into a space in raw bodies (fix: decode `+` only in query
+  strings and `application/x-www-form-urlencoded` bodies; needs a data rebuild).
+
 ### 7. PI truncation (started 2026-09-29, user chose "improve prompt injection")
 
 At max_length 256, 71–73% of val prompts and 68% of held-out jackhhao jailbreaks are cut;
