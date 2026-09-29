@@ -428,3 +428,21 @@ safe-only 0.837 / **0.826**. Val now picks threat-only for http and URL, safe-on
 - Next for PI: short / multilingual variety (e.g. non-English benign and injection prompts
   from a non-held-out source), then seeds. WildJailbreak full (gated) would add many more
   long adversarial prompts on both sides.
+
+## Data v6 — joint `v6-l6`, seed 0 (2026-09-29)
+
+Same recipe on data v6 (52.4k examples, best epoch 2). AUROC, two-pass:
+
+| decision | set | v5-l6 | v6-l6 | TF-IDF v6 |
+|---|---|---|---|---|
+| prompt_injection | held-out | 0.829 | 0.824 | 0.885 |
+| | · deepset (FPR@0.5) | 0.747 (0.36) | **0.787 (0.28)** | 0.873 (0.03) |
+| | · jackhhao | 0.870 | 0.848 | 0.942 |
+| | val | 0.813 | 0.796 | 0.795 |
+| http_attack | held-out / val | 0.955 / 0.940 | 0.982 / 0.907 | |
+| phishing_url | held-out / val | 0.817 / 0.947 | 0.776 / 0.934 | |
+
+- The short / non-English data moved deepset the intended way (+0.04, fewer false alarms).
+- **http_attack moved ±0.03 with identical http data**, so one-run differences of this size
+  are noise. Seeds 1 and 2 for both v5 and v6 are running (`DATA=data_v5 bash
+  scripts/m4_runs.sh 1 v5 joint`, …); compare with `scripts/seed_summary.py`.

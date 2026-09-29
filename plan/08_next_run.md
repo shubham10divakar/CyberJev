@@ -106,6 +106,11 @@ TF-IDF out of domain** (held-out 0.766 vs 0.887, val 0.676 vs 0.740; one-pass th
    Optional: full `allenai/wildjailbreak` once its terms are accepted on the HF account.
 2. Consider 2–3 epochs or a lower LR for URL (best epoch 1).
 3. Then seeds 1, 2 for the M4 comparison, and ONNX export of the chosen joint model.
+   **In progress 2026-09-29:** data v6 (short, non-English PI) built; joint v6-l6 seed 0
+   done (deepset 0.747 → 0.787; other numbers within one-run noise). Seeds 1, 2 of v5 and v6
+   running; pick v5 or v6 by mean val AUROC (`python scripts/seed_summary.py --runs v5_l6
+   v5_l6_s1 v5_l6_s2 --runs v6_l6 v6_l6_s1 v6_l6_s2`). `data_v5/` is a git-ignored rebuild
+   (`prepare_data.py --preset v5 --out data_v5`).
 
 #### Original M3 note
 
