@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # M4: one 6-layer model on all three decisions (data v4) vs single-decision models.
 # http_attack's single-decision model is v3-l6 (same http_attack data). One GPU job at a time.
-#   bash scripts/m4_runs.sh [seed]
+#   bash scripts/m4_runs.sh [seed] [name prefix, default v4] [all | joint]
 set -e
 export PYTHONIOENCODING=utf-8
 L6=../nano_jev/runs/nano-jev-v0.1
 SEED=${1:-0}
 SUF=$([ "$SEED" = 0 ] || echo "-s$SEED")
+PREFIX=${2:-v4}
+WHICH=${3:-all}
 
 run() {  # name decisions...
     local name=$1; shift
@@ -24,7 +26,9 @@ run() {  # name decisions...
         --out "results/single_pass_${tag#cyberjev_}.md"
 }
 
-run "cyber-jev-v4-l6$SUF"
-run "cyber-jev-v4-l6-pi$SUF" prompt_injection
-run "cyber-jev-v4-l6-url$SUF" phishing_url
+run "cyber-jev-$PREFIX-l6$SUF"
+if [ "$WHICH" = all ]; then
+    run "cyber-jev-$PREFIX-l6-pi$SUF" prompt_injection
+    run "cyber-jev-$PREFIX-l6-url$SUF" phishing_url
+fi
 echo ALL DONE

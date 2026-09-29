@@ -31,6 +31,14 @@ PI_DEEPSET = "deepset/prompt-injections"            # held-out: small, multiling
 PI_JACKHHAO = "jackhhao/jailbreak-classification"   # held-out: role-play jailbreaks vs benign personas, Apache-2.0
 PI_WILD = "TrustAIRLab/in-the-wild-jailbreak-prompts"  # val: in-the-wild jailbreak vs regular prompts, MIT
 # (SPML chatbot prompts were rejected for val: text length alone separates its labels, AUROC 1.00.)
+# Data v5 prompt_injection additions (training only, length-matched, near-duplicate filtered).
+PI_WILDJB = "walledai/WildJailbreak"                # WildJailbreak eval: adversarial harmful / benign, ODC-BY
+PI_SIMSONSUN = "Simsonsun/JailbreakPrompts"         # long jailbreak prompts, MIT
+PI_MOSSCAP = "Lakera/mosscap_prompt_injection"      # Gandalf-style password extraction attempts, MIT
+PI_GANDALF = "Lakera/gandalf_ignore_instructions"   # "ignore your instructions" attacks, MIT
+PI_AWESOME = "saidutta69/awesome-chatgpt-prompts-clean"  # "act as ..." role-play prompts, CC0
+PI_SYSPROMPT = "garak-llm/tm-system_prompt"         # benign system prompts, CC-BY-4.0
+PI_DOLLY = "databricks/databricks-dolly-15k"        # benign instructions (+ context), CC-BY-SA-3.0
 
 # phishing_url (M3). Hosts in held-out / val are kept out of training (not just exact URLs).
 URL_FLWR = "flwrlabs/fed-phishing-urls"             # merged URL sets, 1.1M, 0 legit / 1 phishing, Apache-2.0
@@ -296,6 +304,70 @@ def phishing_url_all(sizes: dict, rng: random.Random) -> dict[str, list]:
     return out
 
 
+def _near_keys(text: str, n: int = 100) -> tuple[str, str]:
+    """First and last n characters, lower-cased, letters and digits only."""
+    import re
+
+    t = re.sub(r"[^a-z0-9]", "", text.lower())
+    return t[:n], t[-n:]
+
+
+def prompt_injection_extra(sizes: dict, rng: random.Random, exclude: set[str]) -> dict[str, list]:
+    """Long, varied prompts on both sides (data v5), equal counts per length band so length
+    carries no label. Drops exact and near duplicates (same first or last 100 normalised
+    characters) of anything in `exclude` (held-out, val and existing splits)."""
+    import bisect
+
+    blocked = set()
+    for t in exclude:
+        if len(t) >= 40:
+            blocked |= set(_near_keys(t))
+    pos, neg = [], []
+
+    def add(bucket, texts, source):
+        for t in texts:
+            t = _prompt(t)
+            if len(t) >= 10 and t not in exclude and not (set(_near_keys(t)) & blocked if len(t) >= 40 else False):
+                bucket.append((t, source))
+
+    w = load_dataset(PI_WILDJB, split="train")
+    add(pos, [p for p, lab in zip(w["prompt"], w["label"]) if lab == "adversarial_harmful"], "wildjailbreak/adversarial_harmful")
+    add(neg, [p for p, lab in zip(w["prompt"], w["label"]) if lab == "adversarial_benign"], "wildjailbreak/adversarial_benign")
+    sims = load_dataset(PI_SIMSONSUN)
+    add(pos, [p for part in sims.values() for p in part["Prompt"]], "simsonsun/jailbreak")
+    moss = load_dataset(PI_MOSSCAP, split="train")
+    idx = rng.sample(range(len(moss)), min(len(moss), 20_000))
+    add(pos, [moss[i]["prompt"] for i in idx], "mosscap/injection")
+    add(pos, load_dataset(PI_GANDALF, split="train")["text"], "gandalf/injection")
+    add(neg, load_dataset(PI_AWESOME, split="train")["system_prompt"], "awesome-prompts/safe")
+    add(neg, load_dataset(PI_SYSPROMPT, split="train")["prompt"], "system-prompts/safe")
+    dolly = load_dataset(PI_DOLLY, split="train")
+    add(neg, [r["instruction"] + ("\n\n" + r["context"] if r["context"] else "") for r in dolly],
+        "dolly/safe")
+
+    bands = [0, 50, 100, 200, 400, 800, 1600, 3200, 10**9]
+    band = lambda t: bisect.bisect_right(bands, len(t))  # noqa: E731
+    by = {}
+    for label, bucket in [(1, pos), (0, neg)]:
+        seen = set()
+        for t, src in bucket:
+            if t not in seen:
+                seen.add(t)
+                by.setdefault((band(t), label), []).append((t, label, src))
+    # Longest bands first (the long prompts are what v4 lacked), same count per label in each.
+    rows, left = [], sizes["pi_extra_per_class"]
+    for b in sorted({b for b, _ in by}, reverse=True):
+        p, q = by.get((b, 1), []), by.get((b, 0), [])
+        rng.shuffle(p)
+        rng.shuffle(q)
+        n = min(len(p), len(q), left)
+        rows += p[:n] + q[:n]
+        left -= n
+    rng.shuffle(rows)
+    n_cal, n_test = int(0.05 * len(rows)), int(0.10 * len(rows))
+    return {"calib": rows[:n_cal], "test": rows[n_cal: n_cal + n_test], "train": rows[n_cal + n_test:]}
+
+
 def _examples(rows, decision: str = "http_attack"):
     return [_example(decision, y, t, s) for t, y, s in rows]
 
@@ -322,7 +394,13 @@ def build_all(sizes: dict, seed: int = 0) -> dict[str, list[dict]]:
     # Other decisions (M3): each with its own rng, appended after http_attack.
     others = []
     if sizes.get("pi_slabs_train"):
-        others.append(("prompt_injection", prompt_injection_all(sizes, random.Random(f"{seed}-pi"), set())))
+        pi = prompt_injection_all(sizes, random.Random(f"{seed}-pi"), set())
+        if sizes.get("pi_extra_per_class"):
+            existing = {r[0] for part in pi.values() for r in part}
+            for name, rows in prompt_injection_extra(sizes, random.Random(f"{seed}-pi-extra"),
+                                                     existing).items():
+                pi[name] += rows
+        others.append(("prompt_injection", pi))
     if sizes.get("url_train_per_cell"):
         others.append(("phishing_url", phishing_url_all(sizes, random.Random(f"{seed}-url"))))
     for decision, parts in others:
