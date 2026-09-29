@@ -58,6 +58,13 @@ source that isn't the held-out one (e.g. a text-to-SQL dataset such as Spider or
 queries, labelled safe), then re-check held-out FPR. Don't train on `zrmarine/sql_injection`:
 it's held-out.
 
+### 3b. Out-of-domain validation set (new, 2026-09-29)
+
+Calib is in-domain and held-out is test-only, so there's nothing to make out-of-domain
+choices on (threat-only vs safe-only, thresholds). Add a small `data_val/` from a source that
+is neither training nor held-out, used only for such choices. Also look for a harder held-out
+web-request source: `dvwa-juiceshop` can be separated by path alone.
+
 ### 4. Then M3: `prompt_injection` and `phishing_url`
 
 Verify the candidate datasets listed in `03_data.md` (existence, size, labels, licence),
