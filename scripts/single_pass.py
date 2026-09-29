@@ -43,6 +43,7 @@ def main():
     ap.add_argument("--data", default="data")
     ap.add_argument("--heldout", default="data_heldout")
     ap.add_argument("--val", default="data_val", help="folder with val.jsonl ('' for none)")
+    ap.add_argument("--decisions", nargs="*", help="only these decisions (default: all)")
     ap.add_argument("--max-length", type=int, default=256)
     ap.add_argument("--out", help="write the tables to this .md (and .json)")
     ap.add_argument("--save", action="store_true",
@@ -58,7 +59,7 @@ def main():
     data = {k: by_decision(read_jsonl(p)) for k, p in sets.items()}
 
     sections, report, one_pass = [], {}, {}
-    for dec in sorted(data["in-domain"]):
+    for dec in sorted(d for d in data["in-domain"] if not args.decisions or d in args.decisions):
         scored = {k: torch.stack(M.score(model, tok, d[dec], args.max_length, device))
                   for k, d in data.items()}
         calib_y = labels_of(data["calib"][dec])

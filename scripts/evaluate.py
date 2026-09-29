@@ -32,6 +32,7 @@ def main():
                     help="file in --test-data to report on (data_val: val.jsonl)")
     ap.add_argument("--name", default="results", help="results file name (without extension)")
     ap.add_argument("--results-dir", help="where to write results (default: the model folder)")
+    ap.add_argument("--decisions", nargs="*", help="only these decisions (default: all)")
     ap.add_argument("--max-length", type=int, default=512)
     ap.add_argument("--no-save", action="store_true",
                     help="don't write anything into the model folder (use for released weights)")
@@ -44,6 +45,8 @@ def main():
 
     report = {}
     for dec in sorted(test):
+        if args.decisions and dec not in args.decisions:
+            continue
         c_logits = torch.stack(M.score(model, tok, calib[dec], args.max_length, device))
         t0 = time.time()
         t_logits = torch.stack(M.score(model, tok, test[dec], args.max_length, device))

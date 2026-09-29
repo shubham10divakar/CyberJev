@@ -42,6 +42,7 @@ def main():
     ap.add_argument("--max-length", type=int, default=512)
     ap.add_argument("--dev-size", type=int, default=1500)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--decisions", nargs="*", help="train only on these decisions (default: all)")
     args = ap.parse_args()
 
     random.seed(args.seed)
@@ -49,8 +50,9 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     use_amp = device == "cuda"
 
-    train = read_jsonl(Path(args.data) / "train.jsonl")
-    calib = read_jsonl(Path(args.data) / "calib.jsonl")
+    keep = lambda exs: [ex for ex in exs if not args.decisions or ex["decision"] in args.decisions]  # noqa: E731
+    train = keep(read_jsonl(Path(args.data) / "train.jsonl"))
+    calib = keep(read_jsonl(Path(args.data) / "calib.jsonl"))
     # Dev loss is tracked on a slice of calib; it only selects the best epoch.
     dev = random.Random(args.seed).sample(calib, min(args.dev_size, len(calib)))
     # Group by option count so each group's logits stack into one tensor.
@@ -105,6 +107,7 @@ def main():
                 "schema_version": SCHEMA_VERSION,
                 "decisions": {k: list(v.options) for k, v in DECISIONS.items()},
                 "epochs_trained": epoch + 1, "dev_nll": nll,
+                "trained_decisions": sorted({ex["decision"] for ex in train}), "seed": args.seed,
             }, indent=2))
             print(f"  saved to {out}")
 
