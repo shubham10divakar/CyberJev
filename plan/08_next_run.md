@@ -99,7 +99,9 @@ TF-IDF out of domain** (held-out 0.766 vs 0.887, val 0.676 vs 0.740; one-pass th
 0.861 / 0.749). Next, before more seeds:
 1. PI data diversity: longer, in-the-wild style prompts on both sides (benign role-play /
    system prompts, long jailbreaks) from sources that are not held-out or val; check the
-   length shortcut stays low in training.
+   length shortcut stays low in training. **Started 2026-09-29: data v5 built (see
+   `03_data.md`), joint `v5-l6` training (`m4_runs.sh 0 v5 joint`).** Optional: full
+   `allenai/wildjailbreak` once its terms are accepted on the HF account.
 2. Consider 2–3 epochs or a lower LR for URL (best epoch 1).
 3. Then seeds 1, 2 for the M4 comparison, and ONNX export of the chosen joint model.
 

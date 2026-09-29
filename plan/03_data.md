@@ -109,6 +109,41 @@ Length is a shortcut everywhere else (length-only AUROC): train 0.72–0.74, hel
 but compare the model with this baseline. Held-out jailbreaks are longer than max_length
 256, so the model sees only their start.
 
+#### Data v5 (2026-09-29): long, length-matched `prompt_injection` training prompts
+
+Why: the M4 joint model was below TF-IDF out of domain on prompt_injection (held-out 0.766,
+val 0.676) and flagged 72% of jackhhao's benign role-play prompts. v4 training prompts were
+short and templated (median ~50 chars) while held-out / val prompts are long and in-the-wild.
+
+`prompt_injection_extra` (preset `v5` = default) adds 6000 prompts, 5100 / 300 / 600 to
+train / calib / test:
+
+| Side | Source | License | In v5 |
+|---|---|---|---|
+| injection | `Simsonsun/JailbreakPrompts` (DAN-style jailbreaks) | MIT | 1377 |
+| injection | `walledai/WildJailbreak` adversarial_harmful (WildJailbreak eval split) | ODC-BY | 1040 |
+| injection | `Lakera/mosscap_prompt_injection` (Gandalf password attempts) | MIT | 583 |
+| safe | `databricks/databricks-dolly-15k` instruction + context | CC-BY-SA-3.0 | 2122 |
+| safe | `saidutta69/awesome-chatgpt-prompts-clean` ("act as …" role-play) | CC0 | 783 |
+| safe | `walledai/WildJailbreak` adversarial_benign (jailbreak-style framing, harmless ask) | ODC-BY | 95 |
+
+(Also loaded but not selected after length matching: `Lakera/gandalf_ignore_instructions`,
+`garak-llm/tm-system_prompt`: too short or too few.)
+
+- **Length-matched:** equal counts per label in each length band (0/50/100/200/400/800/
+  1600/3200 chars), longest bands first. The additions are median 1006 chars, all ≥ 200;
+  length-only AUROC 0.494. Over all PI training data, length-only AUROC 0.72 → 0.61.
+- **Near-duplicate filter:** besides exact matches, drop any prompt whose first or last 100
+  normalised characters (lower-case, letters and digits) match a held-out, val or existing
+  prompt. Needed because Simsonsun had 97 exact copies of held-out and 69 of val prompts
+  (renamed DAN variants circulate widely).
+- Held-out, val and the other decisions are unchanged (diffed against v4).
+- **Label caveat:** WildJailbreak adversarial_benign and awesome-chatgpt role-play are
+  labelled safe (role-play framing without an attempt to override the model), matching how
+  jackhhao and TrustAIRLab label benign personas.
+- **Not available yet:** the full `allenai/wildjailbreak` (262k train, adversarial harmful
+  and benign) is gated; access needs the account owner to accept its terms on the website.
+
 #### `phishing_url`
 
 | Role | Source | What it is | Size | License |
