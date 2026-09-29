@@ -4,7 +4,8 @@ Start here. Full numbers are in `07_status.md`; data details in `03_data.md`.
 
 ## Where things stand
 
-- **Working model: `runs/cyber-jev-v2-l6`** (6 layers, from Nano-Jev v0.1 =
+- **Working model: `runs/cyber-jev-v3-l6`** (data v3, since 2026-09-29; see step 3 below).
+  Before that: `runs/cyber-jev-v2-l6` (6 layers, from Nano-Jev v0.1 =
   `../nano_jev/runs/nano-jev-v0.1`). Trained on data v2, 4 epochs (best epoch 3), max_length 256.
   In-domain AUROC 0.995, held-out AUROC 0.953. Also has `model.onnx` and `model.int8.onnx`.
 - `runs/cyber-jev-v2` (12 layers, from Nano-Jev v1.0): same in-domain, worse held-out (0.881).
@@ -54,7 +55,14 @@ always picked threat-only. Details in `07_status.md`. Next: confirm safe-only on
 out-of-domain validation set (3b). **Settled:** val picks threat-only on all three runs, so
 threat-only stays (`07_status.md`).
 
-### 3. Hard benign negatives (in progress 2026-09-29: data v3 built, v3-l6 training)
+### 3. ✅ Hard benign negatives (done 2026-09-29: data v3, working model now `runs/cyber-jev-v3-l6`)
+
+Benign-SQL false alarms: Spider 0.55 → 0.00, held-out sqli-queries 0.41 → 0.20, SQLi detection
+unchanged; small cost on waf-v2 requests (AUROC 0.885 → 0.875). Details in `07_status.md`.
+Left open: export v3-l6 to ONNX (`onnx_cpu.py --save`, two-pass and `--one-pass`) and
+re-check CPU latency; look at why waf-v2 dropped (what normal requests are now flagged).
+
+### 3 (original note)
 
 Both models flag benign SQL queries (sqli-queries FPR@0.5: 0.41 for v2-l6) even though the
 ranking is good (AUROC 0.99). Add benign SQL-like / code-like text to **training** from a

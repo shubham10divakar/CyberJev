@@ -259,3 +259,40 @@ stays**. Switching on the held-out numbers alone would have been a mistake.
 Val is much harder than held-out (AUROC 0.82–0.87 vs 0.90–0.95; waf-v2 alone 0.86–0.89), and
 v2 models flag about half of benign Spider SQL at 0.5 (FPR 0.47–0.63), the problem data v3
 is meant to fix.
+
+## M2 step 3 — data v3 results, `runs/cyber-jev-v3-l6` (2026-09-29)
+
+`scripts/v3_runs.sh`: 6-layer, from Nano-Jev v0.1, 4 epochs (best epoch 3 for both seeds),
+max_length 256, 24.5k examples, ~101 s/epoch. v2-l6 re-scored on the same sets (temperature
+refitted on v3 calib) as the baseline. Two-pass, calibrated:
+
+| model | in-domain AUROC | held-out AUROC | held-out DR@1%FPR | val AUROC | val DR@1%FPR |
+|---|---|---|---|---|---|
+| v2-l6 (baseline) | 0.970 | 0.953 | 0.457 | 0.856 | 0.229 |
+| **v3-l6** (seed 0) | **0.997** | 0.949 | 0.030 | **0.909** | 0.169 |
+| v3-l6-s1 | 0.996 | 0.985 | 0.824 | 0.903 | 0.326 |
+
+By source, at the 0.5 threshold (FPR = safe flagged, DR = attacks caught):
+
+| source | v2-l6 | v3-l6 | v3-l6-s1 |
+|---|---|---|---|
+| gretel-sql (in-domain, all safe) FPR | 0.788 | **0.002** | **0.002** |
+| spider (val, all safe) FPR | 0.549 | **0.000** | **0.000** |
+| sqli-queries (held-out) FPR / DR | 0.413 / 0.999 | **0.203** / 0.993 | **0.159** / 0.995 |
+| sqli-queries AUROC | 0.992 | 0.988 | 0.996 |
+| dvwa-juiceshop AUROC | 0.975 | 0.852 | 0.956 |
+| waf-v2 (val) AUROC | 0.885 | 0.875 | 0.867 |
+| waf-v2 FPR / DR | 0.398 / 0.909 | 0.451 / 0.893 | 0.477 / 0.898 |
+
+- **Benign SQL is fixed.** False alarms on benign SQL drop to ~0 on both gretel and the
+  unseen, human-written Spider, and halve on held-out sqli-queries, while SQLi detection at
+  0.5 stays at 0.99.
+- **Small cost on waf-v2 web requests:** AUROC 0.885 → 0.867–0.875. The three v2-l6 runs
+  scored 0.882–0.885 there, so the ~0.01–0.02 drop looks real, not noise.
+- **Pooled numbers mislead.** Val AUROC rises mainly because Spider is now scored safe. The
+  pooled held-out DR@1%FPR swings 0.03 ↔ 0.82 between seeds (a few confidently flagged safe
+  examples decide the 1% threshold), and dvwa-juiceshop AUROC 0.852 ↔ 0.956. Read
+  per-source numbers.
+- **Working model: v3-l6 (seed 0)**, picked by val AUROC (0.909 vs 0.903), not by held-out.
+- One pass: val picks threat-only for both (v3-l6: 0.910 vs safe-only 0.893). Held-out again
+  favoured safe-only (0.980 vs 0.928): the same split as with v2.
