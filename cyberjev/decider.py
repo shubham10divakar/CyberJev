@@ -64,7 +64,7 @@ class Decider:
             if onnx_file is None:
                 raise FileNotFoundError(f"no {onnx_backend.INT8} or {onnx_backend.FP32} in {local}")
             if not onnx_backend.available():
-                raise ImportError("backend='onnx' needs onnxruntime: pip install codejev[onnx]")
+                raise ImportError("backend='onnx' needs onnxruntime: pip install cyberjev[onnx]")
             if str(device) != "cpu":
                 raise ValueError("backend='onnx' runs on CPU only")
         use_onnx = backend == "onnx" or (backend == "auto" and str(device) == "cpu"

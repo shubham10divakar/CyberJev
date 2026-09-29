@@ -2,8 +2,8 @@
 
 ## 0.1.0 (2026-09-29)
 
-- First PyPI release as **`codejev`** (`pip install codejev`); the import name stays
-  `cyberjev`. Command `codejev` (`cyber-jev` still works).
+- First PyPI release as **`cyberjev`** (`pip install cyberjev`). Command `cyberjev`
+  (`cyber-jev` still works).
 - Default weights `v0.1` are downloaded from Hugging Face (`sdmlai/cyber-jev`) on first use.
 
 ## Weights v0.1 (2026-09-29)

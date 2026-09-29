@@ -1,6 +1,6 @@
 """Command-line tool: list, download and choose weights; run decisions.
 
-Installed as `codejev` (and `cyber-jev`); `python -m cyberjev` is the same thing.
+Installed as `cyberjev` (and `cyber-jev`); `python -m cyberjev` is the same thing.
 
     python -m cyberjev list                   # versions on the Hub (* = selected)
     python -m cyberjev list --local runs      # also show local training runs
@@ -112,10 +112,10 @@ def cmd_decide(args):
 
 def main(argv=None):
     from . import __version__
-    ap = argparse.ArgumentParser(prog="codejev",
+    ap = argparse.ArgumentParser(prog="cyberjev",
                                  description="Cyber-Jev: tiny calibrated decision model for security checks.")
     ap.add_argument("--version", action="version",
-                    version=f"codejev {__version__} (default weights {registry.DEFAULT_VERSION})")
+                    version=f"cyberjev {__version__} (default weights {registry.DEFAULT_VERSION})")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     p = sub.add_parser("list", help="list available weights")
