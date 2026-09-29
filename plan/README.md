@@ -39,3 +39,4 @@ Zero-shot Nano-Jev v1.0 can't tell attacks from normal requests: on
 `GET /login?user=admin' OR '1'='1' --` it said 74% safe, and v0.1 called every request
 an attack. The architecture is fine; it has just never seen security data. Cyber-Jev is
 Nano-Jev fine-tuned on security decisions, with its own schema, package and weights.
+- `09_paper_readiness.md` — what a paper needs and where we stand
