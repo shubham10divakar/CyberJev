@@ -45,10 +45,13 @@ ONNX int8 CPU median **4.2 ms** (target ≤ 5), held-out AUROC 0.945–0.950 vs 
   runs, p95 ~13 ms (PyTorch 9.8 ms). `results/latency_v2-l6_onnx.md`. Latency varies run to
   run by up to ~1.5 ms with other programs open: one `onnx_cpu.py` rerun gave 5.6 ms.
 
-### 2. Second seed
+### 2. ✅ Second seed (done 2026-09-29)
 
-Retrain `v2` and `v2-l6` with `--seed 1` to confirm the 6-layer model's held-out lead
-(0.953 vs 0.881) is not noise. Also try `--epochs 3`, since epoch 4 was worse for both.
+6-layer lead confirmed (held-out 0.953 / 0.944 vs 12-layer 0.881 / 0.864); 3 epochs worse
+(0.905). Held-out varies a lot run to run (DR@1%FPR 0.26–0.46). Safe-only one-pass beat
+threat-only held-out on all three 6-layer runs (threat-only as low as 0.847), though calib NLL
+always picked threat-only. Details in `07_status.md`. Next: confirm safe-only on the
+out-of-domain validation set (3b), then switch `one_pass.json`.
 
 ### 3. Hard benign negatives
 

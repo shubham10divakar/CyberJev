@@ -205,3 +205,36 @@ End to end, as a caller sees it (`results/latency_v2-l6_onnx.md`, 8 threads, bat
 **4.3–4.5 ms** median over three runs, p95 12.7–13.8 ms; PyTorch 9.8 ms. The two-pass
 `onnx_cpu.py` rerun reproduced 8.0 ms; a one-pass rerun gave 5.6 ms int8 (vs 4.2 before)
 with identical accuracy, so single runs vary by up to ~1.5 ms with other programs open.
+
+## M2 step 2 — second seed and 3 epochs (2026-09-29)
+
+`scripts/seed_runs.sh`: same settings as before (batch 16, lr 3e-5, max_length 256, best epoch
+by dev NLL). Two-pass, calibrated, full test sets:
+
+| model | layers | seed | epochs (best) | in-domain AUROC | held-out AUROC | held-out DR@1%FPR | held-out ECE | sqli FPR@0.5 |
+|---|---|---|---|---|---|---|---|---|
+| v2-l6 | 6 | 0 | 4 (3) | 0.995 | **0.953** | 0.457 | 0.145 | 0.41 |
+| v2-l6-s1 | 6 | 1 | 4 (2) | 0.994 | 0.944 | 0.264 | 0.119 | 0.32 |
+| v2-l6-e3 | 6 | 0 | 3 (2) | 0.995 | 0.905 | 0.305 | 0.175 | 0.52 |
+| v2 | 12 | 0 | 4 (3) | 0.996 | 0.881 | 0.343 | 0.240 | 0.59 |
+| v2-s1 | 12 | 1 | 4 (4) | 0.997 | 0.864 | 0.077 | 0.257 | 0.51 |
+
+- **The 6-layer lead holds** across seeds (0.953 / 0.944 vs 0.881 / 0.864). Keep v2-l6.
+- **3 epochs is not better** (0.905): keep 4 epochs with best-epoch selection.
+- **Held-out is noisy.** In-domain barely moves (0.994–0.997), but held-out AUROC spans
+  0.905–0.953 for the same 6-layer recipe and DR@1%FPR spans 0.26–0.46. Treat single-run
+  held-out differences below ~0.05 AUROC as noise.
+
+One pass (`results/single_pass_*.md`), held-out AUROC:
+
+| model | two-pass | threat-only | safe-only | calib NLL picks |
+|---|---|---|---|---|
+| v2-l6 | 0.953 | 0.945 | **0.958** | threat-only |
+| v2-l6-s1 | 0.944 | 0.913 | **0.963** | threat-only |
+| v2-l6-e3 | 0.905 | 0.847 | **0.949** | threat-only |
+| v2-s1 (12 layers) | 0.864 | 0.848 | 0.853 | threat-only |
+
+On all three 6-layer models, safe-only beats both threat-only and two-pass held-out, while
+threat-only can fall far (0.847). Calib NLL (in-domain) picks threat-only every time, so
+in-domain calibration does not predict out-of-domain robustness here. This is still read off
+the held-out test, so confirm on the out-of-domain validation set (step 3b) before switching.
