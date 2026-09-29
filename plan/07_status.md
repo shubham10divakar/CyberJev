@@ -489,3 +489,28 @@ IP / free-hosting phishing URLs ≥ 0.95. **Known issues found:**
 3. **`normalize_http` decodes `+` to a space everywhere**, also in raw (not URL-encoded)
    POST bodies: `'+document.cookie` became `' document.cookie`. Should only unquote_plus
    query strings / form-encoded bodies.
+
+## PI truncation probes, data v5, seed 0 (2026-09-29)
+
+`results/trunc_probes_v5.md`. AUROC, two-pass:
+
+| decision | set | v5-l6 (head, 256) | v5ht-l6 (head_tail, 256) | v5ml512-l6 (head, 512) |
+|---|---|---|---|---|
+| prompt_injection | held-out | 0.829 | 0.828 | 0.799 |
+| | · jackhhao | 0.870 | 0.867 | 0.820 |
+| | · deepset | 0.747 | 0.756 | 0.765 |
+| | val | 0.813 | 0.787 | 0.808 |
+| http_attack | val (waf-v2 FPR@0.5) | 0.940 (0.10) | 0.922 (0.14) | 0.906 (0.27) |
+| phishing_url | held-out / val | 0.817 / 0.947 | 0.821 / 0.946 | 0.814 / 0.947 |
+
+**Neither helps** (both within or below v5's 3-seed range, PI val 0.799 ± 0.015), so they
+did not get more seeds. Seeing the end of long prompts, or twice as much of them, does not
+improve PI out of domain: **truncation is not the bottleneck.** 512 also costs ~1.3× training
+time and up to 2× inference on long inputs. Keep head / 256. `head_tail` stays available
+(`--truncation`) but is not the default.
+
+What's left for PI points at the model or the labels rather than the input window:
+TF-IDF still leads on held-out (0.88), i.e. lexical cues transfer across these datasets
+better than what the 6-layer cross-encoder learns; and the datasets disagree on what counts
+as an "injection" (jackhhao role-play jailbreaks vs deepset instruction overrides vs
+in-the-wild prompts).

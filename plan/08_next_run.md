@@ -151,3 +151,6 @@ only their start is seen. Two probes on data v5, seed 0 (`trunc_probe`):
 - `v5ht-l6`: `--truncation head_tail` (keep the first and last halves of the budget; same cost).
 - `v5ml512-l6`: max_length 512 (46% of val still longer; long inputs cost ~2×).
 Then 3 seeds for the better one if it beats v5-l6 on val (v5: PI val 0.799 ± 0.015).
+**Done: neither helps** (PI val 0.787 / 0.808 vs 0.813 at seed 0; held-out 0.828 / 0.799).
+Truncation is not the bottleneck; keep head / 256. Remaining PI ideas: a multilingual or
+larger backbone, a TF-IDF + model ensemble, or report PI as a limitation.
