@@ -107,3 +107,54 @@ def test_one_pass_scores_threat_option_alone(decider):
         assert out[1]["attack"] == pytest.approx(probs["attack"], abs=1e-4)
     finally:
         decider.one_pass = {}
+
+
+@pytest.fixture(scope="module")
+def onnx_model_dir(tiny_model_dir, tmp_path_factory):
+    """A copy of the tiny model with model.onnx next to it."""
+    pytest.importorskip("onnxruntime")
+    pytest.importorskip("onnx")
+    import shutil
+    from cyberjev import model as M
+    from cyberjev.onnx_backend import export
+
+    folder = tmp_path_factory.mktemp("tiny-onnx") / "m"
+    shutil.copytree(tiny_model_dir, folder)
+    model, tok = M.load(str(folder), "cpu")
+    export(model, tok, folder / "model.onnx")
+    return folder
+
+
+def test_onnx_backend_matches_torch(onnx_model_dir):
+    from cyberjev.decider import Decider
+
+    onnx = Decider.from_pretrained(str(onnx_model_dir), device="cpu")  # auto picks ONNX on CPU
+    torch_d = Decider.from_pretrained(str(onnx_model_dir), device="cpu", backend="torch")
+    assert onnx.backend == "onnx:model.onnx" and torch_d.backend == "torch"
+    for a, b in zip(onnx.http_attack(REQUESTS), torch_d.http_attack(REQUESTS)):
+        assert a["attack"] == pytest.approx(b["attack"], abs=1e-4)
+    options = ["sqli", "xss", "other"]
+    assert_distribution(onnx.decide("Which?", options, REQUESTS[0]), options)
+
+
+def test_onnx_uses_its_own_calibration(onnx_model_dir):
+    import json
+    from cyberjev.decider import Decider
+
+    path = onnx_model_dir / "calibration.model.json"
+    path.write_text(json.dumps({"http_attack": 9.0}))
+    try:
+        assert Decider.from_pretrained(str(onnx_model_dir), device="cpu").temperatures[
+            "http_attack"] == 9.0
+        assert Decider.from_pretrained(str(onnx_model_dir), device="cpu", backend="torch"
+                                       ).temperatures["http_attack"] == 1.5
+    finally:
+        path.unlink()
+
+
+def test_onnx_backend_needs_a_file(tiny_model_dir):
+    from cyberjev.decider import Decider
+
+    with pytest.raises(FileNotFoundError):
+        Decider.from_pretrained(str(tiny_model_dir), device="cpu", backend="onnx")
+    assert Decider.from_pretrained(str(tiny_model_dir), device="cpu").backend == "torch"

@@ -6,7 +6,8 @@
 Writes model.onnx and model.int8.onnx into the model folder, then reports, for PyTorch,
 ONNX fp32 and ONNX int8 on CPU: http_attack AUROC / DR@1%FPR on the in-domain test set and
 a fixed random sample of the held-out set (temperature refitted on calib for each), and
-batch-1 latency. --one-pass scores only the option named in <model>/one_pass.json and fits
+batch-1 latency. --save writes each ONNX file's calibration next to it for the Decider.
+--one-pass scores only the option named in <model>/one_pass.json and fits
 sigmoid((sign*z - b) / T) on calib instead of the two-option temperature.
 
 Each variant runs in its own process (--variant), so only one model is in memory at a
@@ -22,31 +23,14 @@ import sys
 import time
 from pathlib import Path
 
-import onnxruntime as ort
 import torch
-from onnxruntime.quantization import QuantType, quantize_dynamic
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from cyberjev import model as M  # noqa: E402
 from cyberjev.calibration import (fit_temperature, fit_threat_only, metrics,  # noqa: E402
                                   threat_only_logits)
+from cyberjev.onnx_backend import OnnxModel, export, quantize  # noqa: E402
 from cyberjev.report import labels_of, read_jsonl  # noqa: E402
-
-
-def export(model, tok, path: Path):
-    enc = tok(["question: q option: o"], ["GET / HTTP/1.1"], return_tensors="pt")
-    names = ["input_ids", "attention_mask", "token_type_ids"]
-    dyn = {n: {0: "batch", 1: "seq"} for n in names} | {"logits": {0: "batch"}}
-    torch.onnx.export(model.cpu().eval(), tuple(enc[n] for n in names), str(path),
-                      input_names=names, output_names=["logits"], dynamic_axes=dyn,
-                      opset_version=17, dynamo=False)
-
-
-def ort_session(path: Path, threads: int) -> ort.InferenceSession:
-    so = ort.SessionOptions()
-    so.intra_op_num_threads = threads
-    so.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-    return ort.InferenceSession(str(path), so, providers=["CPUExecutionProvider"])
 
 
 def make_scorer(kind, model, tok, sess, max_length):
@@ -57,8 +41,7 @@ def make_scorer(kind, model, tok, sess, max_length):
             with torch.no_grad():
                 flat = model(**enc).logits.squeeze(-1).float()
         else:
-            flat = torch.from_numpy(sess.run(None, {k: v.numpy() for k, v in enc.items()})[0]
-                                    ).squeeze(-1).float()
+            flat = sess(**enc).logits.squeeze(-1).float()
         out = torch.zeros(len(items), int(p.max()) + 1)
         out[g, p] = flat
         return out
@@ -93,7 +76,7 @@ def run_variant(args, folder: Path) -> dict:
         from transformers import AutoTokenizer
         tok = AutoTokenizer.from_pretrained(args.model)
         path = fp32 if args.variant == "fp32" else int8
-        run = make_scorer("ort", None, tok, ort_session(path, args.threads), args.max_length)
+        run = make_scorer("ort", None, tok, OnnxModel(path, args.threads), args.max_length)
         size = path
 
     calib = read_jsonl(Path(args.data) / "calib.jsonl")
@@ -111,13 +94,15 @@ def run_variant(args, folder: Path) -> dict:
             return fast["sign"] * two_run(single)[:, 0]
 
         t, b = fit_threat_only(score_all(run, calib), labels_of(calib))
+        fitted = {**fast, "temperature": t, "shift": b}
         m = {k: metrics(threat_only_logits(score_all(run, ex), b), labels_of(ex), t)
              for k, ex in tests.items()}
     else:
         t = fit_temperature(score_all(run, calib), labels_of(calib))
+        fitted = t
         m = {k: metrics(score_all(run, ex), labels_of(ex), t) for k, ex in tests.items()}
     med, p95 = latency(run, lat_items)
-    return {"temperature": t, "metrics": m, "median_ms": med, "p95_ms": p95,
+    return {"temperature": t, "fitted": fitted, "metrics": m, "median_ms": med, "p95_ms": p95,
             "size_mb": size.stat().st_size / 2**20}
 
 
@@ -132,6 +117,9 @@ def main():
     ap.add_argument("--n-latency", type=int, default=300)
     ap.add_argument("--one-pass", action="store_true",
                     help="score one option per decision (needs <model>/one_pass.json)")
+    ap.add_argument("--save", action="store_true",
+                    help="write each ONNX file's own fit next to it: calibration.<file>.json, "
+                         "or one_pass.<file>.json with --one-pass (used by the Decider)")
     ap.add_argument("--variant", choices=VARIANTS, help="run one variant, print its JSON row")
     ap.add_argument("--out")
     args = ap.parse_args()
@@ -148,7 +136,7 @@ def main():
         export(model, tok, fp32)
         del model
     if not int8.exists():
-        quantize_dynamic(str(fp32), str(int8), weight_type=QuantType.QInt8)
+        quantize(fp32, int8)
 
     lines = [f"## CPU inference — `{args.model}`, {args.threads} threads, max_length "
              f"{args.max_length}, held-out sample {args.heldout_n}"
@@ -156,7 +144,7 @@ def main():
              "| variant | size MB | in-domain AUROC | in-domain DR@1%FPR | held-out AUROC "
              "| held-out DR@1%FPR | median ms | p95 ms |", "|---|---|---|---|---|---|---|---|"]
     report = {}
-    passthrough = [a for a in sys.argv[1:] if a not in ("--out", args.out)]
+    passthrough = [a for a in sys.argv[1:] if a not in ("--out", args.out, "--save")]
     for key, name in VARIANTS.items():
         proc = subprocess.run([sys.executable, __file__, *passthrough, "--variant", key],
                               capture_output=True, text=True, encoding="utf-8")
@@ -164,6 +152,11 @@ def main():
         if proc.returncode or not rows:
             sys.exit(f"{name} failed:\n{proc.stderr[-2000:]}")
         r = report[name] = json.loads(rows[-1][4:])
+        if args.save and key != "torch":
+            stem = (fp32 if key == "fp32" else int8).stem
+            kind = "one_pass" if args.one_pass else "calibration"
+            (folder / f"{kind}.{stem}.json").write_text(
+                json.dumps({"http_attack": r["fitted"]}, indent=2))
         m = r["metrics"]
         lines.append(f"| {name} | {r['size_mb']:.0f} | {m['in-domain']['auroc']:.3f} "
                      f"| {m['in-domain']['dr_at_1pct_fpr']:.3f} | {m['held-out']['auroc']:.3f} "

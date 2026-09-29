@@ -34,6 +34,10 @@ dependencies = [
 [project.optional-dependencies]
 # Only needed to rebuild the data, train, evaluate or run baselines (scripts/ in the repo).
 train = ["datasets>=3.0", "scikit-learn", "accelerate", "numpy", "tqdm", "matplotlib"]
+# Faster CPU inference: the Decider uses model.int8.onnx / model.onnx when present.
+onnx = ["onnxruntime>=1.17"]
+# Exporting and quantizing (scripts/onnx_cpu.py) also needs onnx.
+export = ["onnxruntime>=1.17", "onnx"]
 test = ["pytest>=8"]
 
 [project.scripts]

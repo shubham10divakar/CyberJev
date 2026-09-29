@@ -4,6 +4,7 @@
     python scripts/bench_latency.py --model runs/cyber-jev-dev --threads 1   # one CPU core
     python scripts/bench_latency.py --model runs/cyber-jev-v2 --max-length 128 --out results/latency_v2_128.md
     python scripts/bench_latency.py --model runs/cyber-jev-v2-l6 --two-pass   # ignore one_pass.json
+    python scripts/bench_latency.py --model runs/cyber-jev-v2-l6 --backend torch   # CPU without ONNX
 
 Reports median and p95 ms for batch size 1 on CPU and GPU, and ms per decision when a
 batch of requests is scored together on GPU.
@@ -48,6 +49,8 @@ def main():
     ap.add_argument("--threads", type=int, help="CPU threads (default: torch's choice)")
     ap.add_argument("--max-length", type=int, help="override the model's max_length")
     ap.add_argument("--no-gpu", action="store_true")
+    ap.add_argument("--backend", default="auto", choices=["auto", "torch", "onnx"],
+                    help="CPU backend (GPU always runs PyTorch)")
     ap.add_argument("--two-pass", action="store_true",
                     help="score both options even if the model has one_pass.json")
     ap.add_argument("--out", help="also write the table to this .md file")
@@ -65,14 +68,17 @@ def main():
 
     devices = ["cpu"] + (["cuda"] if torch.cuda.is_available() and not args.no_gpu else [])
     for device in devices:
-        d = Decider.from_pretrained(args.model, device=device)
+        d = Decider.from_pretrained(args.model, device=device,
+                                    backend=args.backend if device == "cpu" else "torch",
+                                    threads=args.threads)
         if args.max_length:
             d.max_length = args.max_length
         if args.two_pass:
             d.one_pass = {}
         elif device == "cpu":
             lines[0] += ", one pass" if d.one_pass else ""
-        label = f"CPU ({torch.get_num_threads()} threads)" if device == "cpu" else "GPU"
+        label = (f"CPU {d.backend} ({args.threads or torch.get_num_threads()} threads)"
+                 if device == "cpu" else "GPU")
         lines.append(row(f"{label}, batch 1", timings(d.http_attack, states)))
         if device == "cuda":
             batches = [states[i: i + args.batch] for i in range(0, len(states), args.batch)] * 5

@@ -6,14 +6,22 @@ from pathlib import Path
 import torch
 
 from . import model as M
-from . import registry
+from . import onnx_backend, registry
 from .schema import DECISIONS, normalize_http
+
+
+def _read_json(folder: Path, name: str, stem: str | None) -> dict:
+    """<folder>/<name>.<stem>.json if stem and it exists, else <folder>/<name>.json, else {}."""
+    for p in ([folder / f"{name}.{stem}.json"] if stem else []) + [folder / f"{name}.json"]:
+        if p.exists():
+            return json.loads(p.read_text(encoding="utf-8"))
+    return {}
 
 
 class Decider:
     def __init__(self, model, tok, max_length: int, temperatures: dict[str, float], device,
                  config: dict | None = None, path: Path | None = None,
-                 one_pass: dict[str, dict] | None = None):
+                 one_pass: dict[str, dict] | None = None, backend: str = "torch"):
         self.model, self.tok, self.max_length = model, tok, max_length
         self.temperatures, self.device = temperatures, device
         self.config = config or {}  # cyberjev_config.json: version, base, params, ...
@@ -21,6 +29,7 @@ class Decider:
         # one_pass.json (scripts/single_pass.py): per built-in binary decision, which option
         # to score alone ({option, sign, temperature, shift}). Set to {} to always use two passes.
         self.one_pass = one_pass or {}
+        self.backend = backend  # "torch", or "onnx:<file>" when `model` is an OnnxModel
 
     @property
     def version(self) -> str:
@@ -28,14 +37,21 @@ class Decider:
 
     @classmethod
     def from_pretrained(cls, path: str | None = None, device: str | None = None,
-                        revision: str | None = None) -> "Decider":
+                        revision: str | None = None, backend: str = "auto",
+                        threads: int | None = None) -> "Decider":
         """Load weights, downloading them from the Hub on first use.
 
         path: a version ("v0.1"), a Hub repo id ("user/cyber-jev", optionally "@v0.1"),
         or a local folder. None uses the selected model (see `cyberjev.registry`).
         Hub repos are downloaded whole, so the calibration temperatures come along.
+
+        backend: "torch", "onnx" (CPU; model.int8.onnx, else model.onnx), or "auto": ONNX
+        when running on CPU, onnxruntime is installed and the folder has an ONNX file.
+        threads: CPU threads for ONNX Runtime (default: its own choice).
         """
-        device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+        if backend not in ("auto", "torch", "onnx"):
+            raise ValueError(f"backend must be auto, torch or onnx, not {backend!r}")
+        device = device or ("cuda" if torch.cuda.is_available() and backend != "onnx" else "cpu")
         if path and Path(path).is_dir():
             target = path
         elif revision:
@@ -43,14 +59,30 @@ class Decider:
         else:
             target = path
         local = registry.resolve(target)
-        model, tok = M.load(str(local), device)
+        onnx_file = onnx_backend.find(local)
+        if backend == "onnx":
+            if onnx_file is None:
+                raise FileNotFoundError(f"no {onnx_backend.INT8} or {onnx_backend.FP32} in {local}")
+            if not onnx_backend.available():
+                raise ImportError("backend='onnx' needs onnxruntime: pip install cyber-jev[onnx]")
+            if str(device) != "cpu":
+                raise ValueError("backend='onnx' runs on CPU only")
+        use_onnx = backend == "onnx" or (backend == "auto" and str(device) == "cpu"
+                                         and onnx_file is not None and onnx_backend.available())
+        if use_onnx:
+            from transformers import AutoTokenizer
+
+            model, tok = onnx_backend.OnnxModel(onnx_file, threads), AutoTokenizer.from_pretrained(local)
+        else:
+            model, tok = M.load(str(local), device)
         cfg_path = local / "cyberjev_config.json"
         cfg = json.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else {}
-        cal_path = local / "calibration.json"
-        temps = json.loads(cal_path.read_text(encoding="utf-8")) if cal_path.exists() else {}
-        one_path = local / "one_pass.json"
-        one = json.loads(one_path.read_text(encoding="utf-8")) if one_path.exists() else {}
-        return cls(model, tok, cfg.get("max_length", 512), temps, device, cfg, local, one)
+        # Calibration fitted on the ONNX file's own logits (scripts/onnx_cpu.py --save), e.g.
+        # calibration.model.int8.json, wins over the PyTorch one.
+        stem = onnx_file.stem if use_onnx else None
+        temps, one = _read_json(local, "calibration", stem), _read_json(local, "one_pass", stem)
+        return cls(model, tok, cfg.get("max_length", 512), temps, device, cfg, local, one,
+                   f"onnx:{onnx_file.name}" if use_onnx else "torch")
 
     def _fast(self, item: dict) -> dict | None:
         """The one-pass setting for this item, or None to score every option."""
