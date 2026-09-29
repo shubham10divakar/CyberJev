@@ -40,7 +40,9 @@ PRESETS["v4"] = dict(
     url_train_per_cell=2500, url_calib_per_cell=200, url_test_per_cell=500,
     url_phishtrap_per_class=1500, url_destroylist=2000, url_val_per_cell=750)
 # v5 = v4 + long, length-matched prompt_injection training prompts (see 03_data.md).
-PRESETS["default"] = PRESETS["v5"] = dict(PRESETS["v4"], pi_extra_per_class=3000)
+PRESETS["v5"] = dict(PRESETS["v4"], pi_extra_per_class=3000)
+# v6 = v5 + short non-English prompt_injection prompts (script- and length-matched).
+PRESETS["default"] = PRESETS["v6"] = dict(PRESETS["v5"], pi_multi_per_class=1000)
 PRESETS["smoke"].update(sql_train=100, sql_calib=50, sql_test=50,
                         val_waf_per_class=50, val_spider=100,
                         pi_slabs_train=200, pi_slabs_calib=50, pi_slabs_test=50,

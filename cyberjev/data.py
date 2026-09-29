@@ -39,11 +39,17 @@ PI_GANDALF = "Lakera/gandalf_ignore_instructions"   # "ignore your instructions"
 PI_AWESOME = "saidutta69/awesome-chatgpt-prompts-clean"  # "act as ..." role-play prompts, CC0
 PI_SYSPROMPT = "garak-llm/tm-system_prompt"         # benign system prompts, CC-BY-4.0
 PI_DOLLY = "databricks/databricks-dolly-15k"        # benign instructions (+ context), CC-BY-SA-3.0
+# Data v6 prompt_injection additions: short, non-English (held-out deepset is short, partly German).
+PI_YANIS = "yanismiraoui/prompt_injections"         # injections in pt/de/fr/es/it/ro/en, Apache-2.0
+PI_RU = "dmtrdr/russian_prompt_injections"          # Russian injections, Apache-2.0 (jackhhao-derived rows dropped)
+PI_MKQA = "mteb/MKQARetrieval"                      # MKQA questions per language (benign), CC-BY-3.0
 
 # phishing_url (M3). Hosts in held-out / val are kept out of training (not just exact URLs).
 URL_FLWR = "flwrlabs/fed-phishing-urls"             # merged URL sets, 1.1M, 0 legit / 1 phishing, Apache-2.0
 URL_PHISHTRAP = "saidutta69/PhishTrap"              # held-out: Tranco top domains vs Phishing.Database, 2026, MIT
 URL_DESTROYLIST = "phishdestroy/destroylist"        # held-out: phishing domains only, MIT
+# destroylist is a live blocklist that syncs hourly: pin the revision used since data v4.
+URL_DESTROYLIST_REV = "42163edf7d5b18cb104bd26e57ef7c0f1e05af06"   # 2026-09-29 06:30 UTC
 URL_JPXXX = "JPxxx/url-benchmark-dataset"           # val: benign / malicious URLs, Apache-2.0
 
 
@@ -263,8 +269,8 @@ def phishing_url_all(sizes: dict, rng: random.Random) -> dict[str, list]:
     import pandas as pd
     from huggingface_hub import hf_hub_download
 
-    def fetch(repo, filename):
-        return hf_hub_download(repo, filename, repo_type="dataset")
+    def fetch(repo, filename, revision=None):
+        return hf_hub_download(repo, filename, repo_type="dataset", revision=revision)
 
     trap = pd.read_csv(fetch(URL_PHISHTRAP, "data/phishtrap_full.csv"))
     trap_rows = _dedup((normalize_url(u), int(y), f"phishtrap/{'phishing' if y else 'legitimate'}")
@@ -272,7 +278,7 @@ def phishing_url_all(sizes: dict, rng: random.Random) -> dict[str, list]:
     rng.shuffle(trap_rows)
     per = sizes["url_phishtrap_per_class"]
     heldout = [r for r in trap_rows if r[1] == 1][:per] + [r for r in trap_rows if r[1] == 0][:per]
-    with open(fetch(URL_DESTROYLIST, "urls.txt"), encoding="utf-8") as f:
+    with open(fetch(URL_DESTROYLIST, "urls.txt", URL_DESTROYLIST_REV), encoding="utf-8") as f:
         destroy = _dedup((normalize_url(u), 1, "destroylist/phishing") for u in f if u.strip())
     trap_hosts = {url_host(r[0]) for r in trap_rows}
     destroy = [r for r in destroy if url_host(r[0]) not in trap_hosts]
@@ -368,6 +374,58 @@ def prompt_injection_extra(sizes: dict, rng: random.Random, exclude: set[str]) -
     return {"calib": rows[:n_cal], "test": rows[n_cal: n_cal + n_test], "train": rows[n_cal + n_test:]}
 
 
+def prompt_injection_multi(sizes: dict, rng: random.Random, exclude: set[str]) -> dict[str, list]:
+    """Short non-English prompts (data v6). Two script groups (Latin: de/fr/es/it/pt, and
+    Cyrillic: ru), each with equal injection / safe counts per length band, so neither the
+    script nor the length carries the label."""
+    import bisect
+
+    blocked = set()
+    for t in exclude:
+        if len(t) >= 40:
+            blocked |= set(_near_keys(t))
+
+    def ok(t):
+        return len(t) >= 5 and t not in exclude and not (len(t) >= 40 and set(_near_keys(t)) & blocked)
+
+    latin_inj = [(t, "yanismiraoui/injection") for t in map(_prompt, load_dataset(PI_YANIS, split="train")["prompt_injections"])]
+    ru = load_dataset(PI_RU, split="train")
+    ru_inj = [(_prompt(r["prompt_ru"]), f"ru-injections/{r['class']}") for r in ru
+              if r["source"] != "jackhhao/jailbreak-classification"]   # jackhhao is held-out
+    langs = ["de", "fr", "es", "it", "pt", "ru"]
+    safe = {"latin": [], "ru": []}
+    for i, lang in enumerate(langs):
+        # MKQA rows are (nearly) parallel across languages and ids differ per language, so
+        # each language takes its own contiguous block of rows: no question in two languages.
+        qs = load_dataset(PI_MKQA, f"{lang}-queries", split="train")["text"]
+        lo, hi = i * len(qs) // len(langs), (i + 1) * len(qs) // len(langs)
+        safe["ru" if lang == "ru" else "latin"] += [(_prompt(t), f"mkqa-{lang}/safe") for t in qs[lo:hi]]
+
+    bands = [0, 15, 20, 25, 30, 35, 40, 45, 50, 60, 70, 80, 100, 120, 150, 200, 300, 400, 800, 10**9]
+    rows = []
+    for group, inj in [("latin", latin_inj), ("ru", ru_inj)]:
+        by = {}
+        for label, bucket in [(1, inj), (0, safe[group])]:
+            seen = set()
+            for t, src in bucket:
+                if ok(t) and t not in seen:
+                    seen.add(t)
+                    by.setdefault((bisect.bisect_right(bands, len(t)), label), []).append((t, label, src))
+        group_rows = []
+        for b in sorted({b for b, _ in by}):
+            p, q = by.get((b, 1), []), by.get((b, 0), [])
+            rng.shuffle(p)
+            rng.shuffle(q)
+            n = min(len(p), len(q))
+            group_rows += list(zip(p[:n], q[:n]))
+        rng.shuffle(group_rows)
+        for pair in group_rows[: sizes["pi_multi_per_class"]]:
+            rows += pair
+    rng.shuffle(rows)
+    n_cal, n_test = int(0.05 * len(rows)), int(0.10 * len(rows))
+    return {"calib": rows[:n_cal], "test": rows[n_cal: n_cal + n_test], "train": rows[n_cal + n_test:]}
+
+
 def _examples(rows, decision: str = "http_attack"):
     return [_example(decision, y, t, s) for t, y, s in rows]
 
@@ -398,6 +456,11 @@ def build_all(sizes: dict, seed: int = 0) -> dict[str, list[dict]]:
         if sizes.get("pi_extra_per_class"):
             existing = {r[0] for part in pi.values() for r in part}
             for name, rows in prompt_injection_extra(sizes, random.Random(f"{seed}-pi-extra"),
+                                                     existing).items():
+                pi[name] += rows
+        if sizes.get("pi_multi_per_class"):
+            existing = {r[0] for part in pi.values() for r in part}
+            for name, rows in prompt_injection_multi(sizes, random.Random(f"{seed}-pi-multi"),
                                                      existing).items():
                 pi[name] += rows
         others.append(("prompt_injection", pi))
