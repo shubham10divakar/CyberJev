@@ -137,3 +137,11 @@ add builders to `cyberjev/data.py`, and give each a held-out source from a diffe
   difficulty; CSIC is the informative in-domain source.
 - max_length 128 was tested and rejected (it truncates payloads in full requests).
 - p95 latency (~23 ms) is set by long requests. After step 1, look at the p95 again.
+
+### 7. PI truncation (started 2026-09-29, user chose "improve prompt injection")
+
+At max_length 256, 71–73% of val prompts and 68% of held-out jackhhao jailbreaks are cut;
+only their start is seen. Two probes on data v5, seed 0 (`trunc_probe`):
+- `v5ht-l6`: `--truncation head_tail` (keep the first and last halves of the budget; same cost).
+- `v5ml512-l6`: max_length 512 (46% of val still longer; long inputs cost ~2×).
+Then 3 seeds for the better one if it beats v5-l6 on val (v5: PI val 0.799 ± 0.015).
