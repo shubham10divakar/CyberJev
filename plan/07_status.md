@@ -514,3 +514,20 @@ TF-IDF still leads on held-out (0.88), i.e. lexical cues transfer across these d
 better than what the 6-layer cross-encoder learns; and the datasets disagree on what counts
 as an "injection" (jackhhao role-play jailbreaks vs deepset instruction overrides vs
 in-the-wild prompts).
+
+## v5-l6 (joint) on ONNX, per decision (2026-09-29)
+
+`onnx_cpu.py` now works per decision; `--save` wrote `calibration.model*.json` and
+`one_pass.model*.json` for all three decisions. `results/onnx_v5_l6*.md`,
+`results/latency_v5-l6_onnx.md`. int8 costs no accuracy (held-out AUROC within ±0.007 of
+PyTorch). **Decider, one pass, ONNX int8, CPU 8 threads, batch 1** (3 runs, median / p95):
+
+| decision | ONNX int8 median | p95 | PyTorch median |
+|---|---|---|---|
+| http_attack | **3.8–4.1 ms** | 11.9–13.7 | 9.5 |
+| prompt_injection | **2.3–2.5 ms** | 17.4–18.2 | 7.7 |
+| phishing_url | **1.8–1.9 ms** | 3.6–3.9 | 7.3 |
+
+All three meet ≤ 5 ms at the median. PI's p95 (~18 ms) comes from long prompts (256 tokens).
+One pass vs two on the 3000 held-out sample (int8): http 0.942 vs 0.958, URL 0.807 vs 0.815,
+PI 0.833 vs 0.822 — val picked these variants; the held-out cost for http is ~0.016.

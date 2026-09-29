@@ -4,8 +4,8 @@ Start here. Full numbers are in `07_status.md`; data details in `03_data.md`.
 
 ## Where things stand
 
-- **Best joint model so far: `runs/cyber-jev-v5-l6`** (all three decisions, data v5, seed 0;
-  not yet exported to ONNX). Best http-only model: `runs/cyber-jev-v3-l6` (data v3, ONNX).
+- **Working model: `runs/cyber-jev-v5-l6`** (joint, all three decisions, data v5, seed 0;
+  ONNX int8 + calibration in the folder; CPU 1.8–4.1 ms per decision). Best http-only model: `runs/cyber-jev-v3-l6` (data v3, ONNX).
   Before that: `runs/cyber-jev-v2-l6` (6 layers, from Nano-Jev v0.1 =
   `../nano_jev/runs/nano-jev-v0.1`). Trained on data v2, 4 epochs (best epoch 3), max_length 256.
   In-domain AUROC 0.995, held-out AUROC 0.953. Also has `model.onnx` and `model.int8.onnx`.
@@ -158,8 +158,8 @@ larger backbone, a TF-IDF + model ensemble, or report PI as a limitation.
 ### 8. Decision (2026-09-29): PI is a reported limitation; paper items next
 
 Working joint model: `runs/cyber-jev-v5-l6` (data v5; seeds s1, s2 exist). Next, in order:
-1. ONNX int8 export + per-decision calibration + CPU latency for v5-l6 (onnx_cpu.py needs a
-   per-decision loop for the joint model).
+1. ✅ ONNX int8 export + per-decision calibration + CPU latency for v5-l6: Decider medians
+   3.8–4.1 ms (http), 2.3–2.5 ms (PI), 1.8–1.9 ms (URL). See `07_status.md`.
 2. Plain fine-tuned classifier baseline (same 6-layer backbone, input text only, no
    question / option), one per decision, 3 seeds (paper item 5).
 3. Calibration and triage analysis: reliability diagrams and block / review / allow

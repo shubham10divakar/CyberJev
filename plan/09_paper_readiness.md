@@ -19,7 +19,7 @@ Status: ✅ done · ⚠️ partial · ❌ not started
 | 8 | Calibration: ECE per set, reliability diagrams | ⚠️ | ECE in every table; no diagrams |
 | 9 | Triage / cascade result: share sent to review vs error on the rest | ❌ | the stated product (01_goal) |
 | 10 | Ablations: one vs two pass, data v2 → v3, 6 vs 12 layers, path balancing | ⚠️ | first three done (`07_status.md`) |
-| 11 | Latency: CPU / GPU, ONNX int8 | ✅ | 3.8–4.0 ms CPU median (v3-l6) |
+| 11 | Latency: CPU / GPU, ONNX int8 | ✅ | joint v5-l6: 3.8–4.1 / 2.3–2.5 / 1.8–1.9 ms CPU median (http / PI / URL) |
 | 12 | Limitations: length shortcuts, merged public datasets, licences, dvwa path confound | ✅ recorded | write up |
 | 13 | Dataset hygiene findings as a contribution (duplicated / shortcut-laden public sets) | ⚠️ | findings in `03_data.md`; needs a table |
 | 14 | Release weights / code for reproducibility | ❌ | only when asked (M7) |
