@@ -238,3 +238,24 @@ On all three 6-layer models, safe-only beats both threat-only and two-pass held-
 threat-only can fall far (0.847). Calib NLL (in-domain) picks threat-only every time, so
 in-domain calibration does not predict out-of-domain robustness here. This is still read off
 the held-out test, so confirm on the out-of-domain validation set (step 3b) before switching.
+
+## Data v3 and the out-of-domain validation set (2026-09-29)
+
+Data v3 adds 3000 benign SQL queries (gretel, synthetic) to training and builds
+`data_val/val.jsonl` (waf-v2 requests + Spider SQL); details in `03_data.md`.
+
+**One-pass variant on val** (`results/single_pass_v2_l6*_val.md`, v2 models, v2 calib):
+
+| model | val: two-pass | threat-only | safe-only | held-out: threat-only | safe-only |
+|---|---|---|---|---|---|
+| v2-l6 | 0.856 | **0.866** | 0.830 | 0.945 | **0.958** |
+| v2-l6-s1 | 0.833 | **0.834** | 0.817 | 0.913 | **0.963** |
+| v2-l6-e3 | 0.823 | **0.829** | 0.796 | 0.847 | **0.949** |
+
+Val picks threat-only on all three; held-out favoured safe-only. The better variant depends
+on the data, and both fixed rules (calib NLL, val AUROC) pick threat-only, so **threat-only
+stays**. Switching on the held-out numbers alone would have been a mistake.
+
+Val is much harder than held-out (AUROC 0.82–0.87 vs 0.90–0.95; waf-v2 alone 0.86–0.89), and
+v2 models flag about half of benign Spider SQL at 0.5 (FPR 0.47–0.63), the problem data v3
+is meant to fix.

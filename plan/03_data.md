@@ -45,17 +45,41 @@ data_heldout/test.jsonl 10320  sqli-queries 6000 (attack 36%) · dvwa-juiceshop 
 No text occurs in more than one split; held-out examples that match any in-domain text
 are dropped.
 
-### Benign SQL candidates (for step 3, checked 2026-09-29 from Hub metadata only)
+### Data v3 (2026-09-29): benign SQL + out-of-domain validation set
 
-| Dataset | Licence | Size | Notes |
-|---|---|---|---|
-| `gretelai/synthetic_text_to_sql` | Apache-2.0 | 100k+ | synthetic; varied SQL incl. INSERT / UPDATE / DDL. Candidate for **training** benign SQL |
-| `xlangai/spider` | CC-BY-SA-4.0 | ~8k train + 1k val | human-written queries over 200 DBs. Candidate for the **out-of-domain validation** set |
-| `b-mc2/sql-create-context` | CC-BY-4.0 | ~78k | built from WikiSQL + Spider: don't use it next to Spider (overlap) |
-| `Salesforce/wikisql` | unknown | ~80k | loading script only, no licence: skip |
+`python scripts/prepare_data.py` (preset `default` = `v3`; `--preset v2` rebuilds v2 exactly).
+The new sources use their own rng and skip any text already in a split, so v2's splits and
+the held-out set are byte-identical.
 
-Not downloaded yet: check columns, query styles and overlap with `zrmarine/sql_injection`
-(held-out) before use.
+| Role | Source | What it is | Size | License |
+|---|---|---|---|---|
+| train / calib / test | `gretelai/synthetic_text_to_sql` | synthetic benign SQL (SELECT, plus INSERT / UPDATE / DELETE / DDL), labelled safe | 3000 / 200 / 500 | Apache-2.0 |
+| **validation** | `puyang2025/waf_data_v2` test split | full HTTP requests (WordPress site + a local app), normal / anomalous | 750 attack + 750 normal per host, 3000 | MIT |
+| **validation** | `xlangai/spider` dev split | human-written benign SQL, labelled safe | 563 (unique of 1034) | CC-BY-SA-4.0 |
+
+```
+data/train.jsonl        24550  (v2 + gretel-sql 3000)
+data/calib.jsonl         1800  (v2 + gretel-sql 200)
+data/test.jsonl          4700  (v2 + gretel-sql 500)
+data_heldout/test.jsonl 10320  (unchanged)
+data_val/val.jsonl       3563  waf-v2 3000 (attack 50%) · spider 563 (all safe)
+```
+
+**Validation set rules.** Only for out-of-domain *choices* (one-pass variant, thresholds,
+model selection); never for final reporting, which stays on the held-out set. The rule for
+each choice is fixed before looking (one-pass variant: highest val AUROC).
+
+Checks done:
+- `waf_data_v2` has a Host confound (test-site.com is 40% attacks, localhost:8080 5%), so
+  val samples each class equally *within* each host. Its texts don't overlap train or held-out.
+- No Spider query (train or dev) is in the held-out set; Spider dev repeats queries (563 unique).
+- Rejected as validation sources: `AmirAliGharesoufloo/SqlInjection` and
+  `firdhokk/autotrain-data-sql-injection` (hundreds of rows shared with held-out
+  `zrmarine/sql_injection`), `kblanchfield/web-attacks-multiclass` (CSIC again),
+  `grantabejar/payloadsallthethings` (225 markdown files, not examples),
+  `darkknight25/Web_Application_Payloads_Dataset` (fails to load).
+- Also available, unused: `b-mc2/sql-create-context` (CC-BY-4.0, built from WikiSQL + Spider:
+  don't use next to Spider), `Salesforce/wikisql` (no licence: skip).
 
 ### Other decisions
 

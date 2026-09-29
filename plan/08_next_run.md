@@ -51,9 +51,10 @@ ONNX int8 CPU median **4.2 ms** (target ≤ 5), held-out AUROC 0.945–0.950 vs 
 (0.905). Held-out varies a lot run to run (DR@1%FPR 0.26–0.46). Safe-only one-pass beat
 threat-only held-out on all three 6-layer runs (threat-only as low as 0.847), though calib NLL
 always picked threat-only. Details in `07_status.md`. Next: confirm safe-only on the
-out-of-domain validation set (3b), then switch `one_pass.json`.
+out-of-domain validation set (3b). **Settled:** val picks threat-only on all three runs, so
+threat-only stays (`07_status.md`).
 
-### 3. Hard benign negatives
+### 3. Hard benign negatives (in progress 2026-09-29: data v3 built, v3-l6 training)
 
 Both models flag benign SQL queries (sqli-queries FPR@0.5: 0.41 for v2-l6) even though the
 ranking is good (AUROC 0.99). Add benign SQL-like / code-like text to **training** from a
@@ -61,7 +62,7 @@ source that isn't the held-out one (e.g. a text-to-SQL dataset such as Spider or
 queries, labelled safe), then re-check held-out FPR. Don't train on `zrmarine/sql_injection`:
 it's held-out.
 
-### 3b. Out-of-domain validation set (new, 2026-09-29)
+### 3b. ✅ Out-of-domain validation set (done 2026-09-29: `data_val/`, see `03_data.md`)
 
 Calib is in-domain and held-out is test-only, so there's nothing to make out-of-domain
 choices on (threat-only vs safe-only, thresholds). Add a small `data_val/` from a source that
