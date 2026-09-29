@@ -28,6 +28,8 @@ def main():
     ap.add_argument("--model", default="runs/cyber-jev-v0.1")
     ap.add_argument("--data", default="data", help="folder with calib.jsonl (and test.jsonl)")
     ap.add_argument("--test-data", help="folder with the test.jsonl to report on (default: --data)")
+    ap.add_argument("--test-file", default="test.jsonl",
+                    help="file in --test-data to report on (data_val: val.jsonl)")
     ap.add_argument("--name", default="results", help="results file name (without extension)")
     ap.add_argument("--results-dir", help="where to write results (default: the model folder)")
     ap.add_argument("--max-length", type=int, default=512)
@@ -38,7 +40,7 @@ def main():
     device = "cuda" if torch.cuda.is_available() else "cpu"
     model, tok = M.load(args.model, device)
     calib = by_decision(read_jsonl(Path(args.data) / "calib.jsonl"))
-    test = by_decision(read_jsonl(Path(args.test_data or args.data) / "test.jsonl"))
+    test = by_decision(read_jsonl(Path(args.test_data or args.data) / args.test_file))
 
     report = {}
     for dec in sorted(test):
