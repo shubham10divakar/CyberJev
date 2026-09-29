@@ -395,3 +395,36 @@ One pass (`results/single_pass_v4_l6*.md`), AUROC held-out / val:
   on val it is best (0.940). The URL model overfits fast (best epoch 1).
 - The val-picked one-pass variant differs per decision and model now (safe-only for http and
   URL on the joint model), so one_pass.json is per decision, as built.
+
+## Data v5 — joint `v5-l6`, seed 0 (2026-09-29)
+
+`bash scripts/m4_runs.sh 0 v5 joint`: same recipe as v4-l6 on data v5 (50.0k examples,
+215 s/epoch, best epoch 2 by dev NLL 0.131). TF-IDF refitted on v5 for a fair comparison.
+AUROC, two-pass, calibrated:
+
+| decision | set | joint v4-l6 | **joint v5-l6** | TF-IDF v5 | length only |
+|---|---|---|---|---|---|
+| prompt_injection | in-domain | 0.995 | 0.994 | — | — |
+| | held-out | 0.766 | **0.829** | **0.880** | 0.798 |
+| | · deepset | 0.835 | 0.747 | 0.859 | 0.813 |
+| | · jackhhao (FPR@0.5) | 0.727 (0.72) | **0.870 (0.40)** | 0.939 (0.38) | 0.868 |
+| | val (in-the-wild) | 0.676 | **0.813** | 0.791 | 0.502 |
+| http_attack | held-out | 0.956 | 0.955 | | |
+| | val (waf-v2 AUROC / FPR@0.5) | 0.911 (0.878 / 0.16) | **0.940 (0.919 / 0.10)** | | |
+| phishing_url | held-out (PhishTrap) | 0.798 (0.844) | **0.817 (0.874)** | | 0.800 (0.861) |
+| | val | 0.940 | 0.947 | | |
+
+One pass, prompt_injection held-out / val: two-pass 0.829 / 0.813, threat-only 0.813 / 0.802,
+safe-only 0.837 / **0.826**. Val now picks threat-only for http and URL, safe-only for PI.
+
+**Findings (one seed):**
+- **The long, length-matched data fixed most of the PI gap.** Val +0.14 (0.676 → 0.813), now
+  above TF-IDF (0.791; one-pass 0.826). jackhhao false alarms on benign role-play 0.72 → 0.40.
+- **Held-out PI is still below TF-IDF** (0.829 vs 0.880), because **deepset dropped**
+  (0.835 → 0.747): deepset is short and partly German; all v5 additions are long English.
+  jackhhao (0.870) is only level with length alone (0.868).
+- **Other decisions did not suffer, and improved on val:** waf-v2 0.878 → 0.919, PhishTrap
+  0.844 → 0.874 (now above length 0.861). Could be seed noise; needs seeds.
+- Next for PI: short / multilingual variety (e.g. non-English benign and injection prompts
+  from a non-held-out source), then seeds. WildJailbreak full (gated) would add many more
+  long adversarial prompts on both sides.

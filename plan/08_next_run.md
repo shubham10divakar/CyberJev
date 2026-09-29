@@ -4,7 +4,8 @@ Start here. Full numbers are in `07_status.md`; data details in `03_data.md`.
 
 ## Where things stand
 
-- **Working model: `runs/cyber-jev-v3-l6`** (data v3, since 2026-09-29; see step 3 below).
+- **Best joint model so far: `runs/cyber-jev-v5-l6`** (all three decisions, data v5, seed 0;
+  not yet exported to ONNX). Best http-only model: `runs/cyber-jev-v3-l6` (data v3, ONNX).
   Before that: `runs/cyber-jev-v2-l6` (6 layers, from Nano-Jev v0.1 =
   `../nano_jev/runs/nano-jev-v0.1`). Trained on data v2, 4 epochs (best epoch 3), max_length 256.
   In-domain AUROC 0.995, held-out AUROC 0.953. Also has `model.onnx` and `model.int8.onnx`.
@@ -99,9 +100,10 @@ TF-IDF out of domain** (held-out 0.766 vs 0.887, val 0.676 vs 0.740; one-pass th
 0.861 / 0.749). Next, before more seeds:
 1. PI data diversity: longer, in-the-wild style prompts on both sides (benign role-play /
    system prompts, long jailbreaks) from sources that are not held-out or val; check the
-   length shortcut stays low in training. **Started 2026-09-29: data v5 built (see
-   `03_data.md`), joint `v5-l6` training (`m4_runs.sh 0 v5 joint`).** Optional: full
-   `allenai/wildjailbreak` once its terms are accepted on the HF account.
+   length shortcut stays low in training. **Done 2026-09-29: data v5, joint `v5-l6`.** PI val
+   0.676 → 0.813 (above TF-IDF 0.791), held-out 0.766 → 0.829 (TF-IDF 0.880; deepset fell
+   0.835 → 0.747). Next for PI: short / non-English variety from a non-held-out source.
+   Optional: full `allenai/wildjailbreak` once its terms are accepted on the HF account.
 2. Consider 2–3 epochs or a lower LR for URL (best epoch 1).
 3. Then seeds 1, 2 for the M4 comparison, and ONNX export of the chosen joint model.
 
