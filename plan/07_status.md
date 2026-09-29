@@ -446,3 +446,32 @@ Same recipe on data v6 (52.4k examples, best epoch 2). AUROC, two-pass:
 - **http_attack moved ±0.03 with identical http data**, so one-run differences of this size
   are noise. Seeds 1 and 2 for both v5 and v6 are running (`DATA=data_v5 bash
   scripts/m4_runs.sh 1 v5 joint`, …); compare with `scripts/seed_summary.py`.
+
+## Seeds 0–2: joint v5-l6 vs v6-l6 (2026-09-29)
+
+`results/seeds_v5_v6.md` (`scripts/seed_summary.py`), calibrated AUROC, two-pass, mean ± std
+over 3 seeds. TF-IDF (deterministic) for reference.
+
+| decision | set | v5-l6 | v6-l6 | TF-IDF |
+|---|---|---|---|---|
+| http_attack | held-out | 0.962 ± 0.009 | 0.969 ± 0.015 | |
+| | val | 0.915 ± 0.022 | 0.915 ± 0.007 | |
+| phishing_url | held-out | **0.808 ± 0.012** | 0.782 ± 0.007 | 0.710 |
+| | val | 0.944 ± 0.005 | 0.939 ± 0.005 | 0.927 |
+| prompt_injection | held-out | 0.812 ± 0.026 | **0.839 ± 0.013** | **0.880 / 0.885** (v5 / v6) |
+| | · deepset (FPR@0.5) | 0.755 ± 0.012 (0.39) | **0.823 ± 0.032 (0.19)** | 0.859 / 0.873 |
+| | · jackhhao | 0.849 ± 0.033 | 0.856 ± 0.010 | 0.939 / 0.942 |
+| | val | 0.799 ± 0.015 | 0.786 ± 0.010 | 0.791 / 0.795 |
+
+**Pick by the fixed rule (mean val AUROC over decisions): v5** (0.886 vs 0.880). The
+difference is within one std, so v5 and v6 are effectively tied on val.
+
+- **v6 did what it was built for:** deepset +0.07 (> 2 std) and its false alarms halve
+  (0.39 → 0.19). It is not used for the choice because held-out is test-only.
+- **v6 costs phishing_url held-out** (0.808 → 0.782, ~2 std) with unchanged URL data:
+  possible interference from the extra PI data, or noise.
+- **Seed 0 was a lucky run for v5 PI val** (0.813 vs mean 0.799). Over seeds, **PI is level
+  with TF-IDF on val and below it on held-out** (0.81–0.84 vs 0.88). phishing_url beats
+  TF-IDF on both; http_attack is strong (no TF-IDF refit on v5/v6; v3 TF-IDF held-out 0.657).
+- Run-to-run spread is large for some sources (dvwa ± 0.05, waf-v2 FPR ± 0.15): any paper
+  table needs ≥ 3 seeds.

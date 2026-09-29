@@ -111,6 +111,16 @@ TF-IDF out of domain** (held-out 0.766 vs 0.887, val 0.676 vs 0.740; one-pass th
    running; pick v5 or v6 by mean val AUROC (`python scripts/seed_summary.py --runs v5_l6
    v5_l6_s1 v5_l6_s2 --runs v6_l6 v6_l6_s1 v6_l6_s2`). `data_v5/` is a git-ignored rebuild
    (`prepare_data.py --preset v5 --out data_v5`).
+   **Done:** val rule picks **v5** (mean val 0.886 vs 0.880, within noise). Over 3 seeds PI
+   is level with TF-IDF on val (0.799 vs 0.791) and below on held-out (0.812 vs 0.880); v6
+   fixed deepset (+0.07) but cost URL held-out (−0.026). See `07_status.md`.
+
+### 6. Next options (decide)
+
+- PI further: per-decision epochs / loss weighting (PI overfits by epoch 2), longer max_length
+  for PI (jailbreaks are cut at 256 tokens), or the full WildJailbreak (user said skip for now).
+- ONNX export + calibration of the chosen joint model (`runs/cyber-jev-v5-l6`).
+- Paper items 5, 6, 8, 9 (`09_paper_readiness.md`).
 
 #### Original M3 note
 
