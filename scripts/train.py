@@ -43,6 +43,8 @@ def main():
     ap.add_argument("--dev-size", type=int, default=1500)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--decisions", nargs="*", help="train only on these decisions (default: all)")
+    ap.add_argument("--truncation", default="head", choices=M.TRUNCATIONS,
+                    help="head: cut the input's end; head_tail: keep its start and end")
     args = ap.parse_args()
 
     random.seed(args.seed)
@@ -60,7 +62,7 @@ def main():
     for ex in dev:
         dev_by_k.setdefault(len(ex["options"]), []).append(ex)
 
-    model, tok = M.load(args.base, device)
+    model, tok = M.load(args.base, device, truncation=args.truncation)
 
     def collate(batch):
         enc, g, p = M.encode(tok, batch, args.max_length)
@@ -108,6 +110,7 @@ def main():
                 "decisions": {k: list(v.options) for k, v in DECISIONS.items()},
                 "epochs_trained": epoch + 1, "dev_nll": nll,
                 "trained_decisions": sorted({ex["decision"] for ex in train}), "seed": args.seed,
+                "truncation": args.truncation,
             }, indent=2))
             print(f"  saved to {out}")
 

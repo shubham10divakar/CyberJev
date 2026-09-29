@@ -73,8 +73,7 @@ def run_variant(args, folder: Path) -> dict:
         model, tok = M.load(args.model, "cpu")
         run, size = make_scorer("torch", model, tok, None, args.max_length), folder / "model.safetensors"
     else:
-        from transformers import AutoTokenizer
-        tok = AutoTokenizer.from_pretrained(args.model)
+        tok = M.load_tokenizer(args.model)
         path = fp32 if args.variant == "fp32" else int8
         run = make_scorer("ort", None, tok, OnnxModel(path, args.threads), args.max_length)
         size = path

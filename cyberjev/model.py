@@ -11,8 +11,40 @@ from transformers import AutoModelForSequenceClassification, AutoTokenizer
 DEFAULT_BASE = "cross-encoder/ms-marco-MiniLM-L6-v2"
 
 
-def load(name_or_path: str, device: str | torch.device):
+TRUNCATIONS = ("head", "head_tail")
+
+
+def load_tokenizer(name_or_path: str, truncation: str | None = None):
+    """Tokenizer plus the model's truncation mode (`cyberjev_truncation`), read from
+    cyberjev_config.json ("truncation") unless given. Models without it use "head"."""
+    import json
+    from pathlib import Path
+
     tok = AutoTokenizer.from_pretrained(name_or_path)
+    if truncation is None:
+        cfg = Path(name_or_path) / "cyberjev_config.json"
+        truncation = json.loads(cfg.read_text()).get("truncation", "head") if cfg.exists() else "head"
+    if truncation not in TRUNCATIONS:
+        raise ValueError(f"truncation must be one of {TRUNCATIONS}, not {truncation!r}")
+    tok.cyberjev_truncation = truncation
+    return tok
+
+
+def _head_tail(tok, first: str, state: str, max_length: int) -> str:
+    """If state doesn't fit, keep its first and last halves of the token budget (joined by
+    " ... "), so both an opening persona and an appended instruction stay visible."""
+    budget = max_length - len(tok(first)["input_ids"]) - 1          # [CLS] first [SEP] state [SEP]
+    enc = tok(state, add_special_tokens=False, return_offsets_mapping=True)
+    offsets = enc["offset_mapping"]
+    if len(offsets) <= budget or budget < 8:
+        return state
+    head = (budget - 4) // 2                                        # " ... " costs 3 tokens
+    tail = budget - 4 - head
+    return state[: offsets[head - 1][1]] + " ... " + state[offsets[-tail][0]:]
+
+
+def load(name_or_path: str, device: str | torch.device, truncation: str | None = None):
+    tok = load_tokenizer(name_or_path, truncation)
     model = AutoModelForSequenceClassification.from_pretrained(
         name_or_path, num_labels=1, ignore_mismatched_sizes=True
     )
@@ -25,10 +57,13 @@ def encode(tok, items: list[dict], max_length: int):
     Returns the tokenized batch and, per pair, its item index and option position.
     """
     firsts, seconds, group_idx, pos_idx = [], [], [], []
+    head_tail = getattr(tok, "cyberjev_truncation", "head") == "head_tail"
     for g, item in enumerate(items):
         for p, opt in enumerate(item["options"]):
-            firsts.append(f"question: {item['question']} option: {opt}")
-            seconds.append(item["state"])
+            first = f"question: {item['question']} option: {opt}"
+            firsts.append(first)
+            seconds.append(_head_tail(tok, first, item["state"], max_length) if head_tail
+                           else item["state"])
             group_idx.append(g)
             pos_idx.append(p)
     enc = tok(

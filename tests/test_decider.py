@@ -158,3 +158,18 @@ def test_onnx_backend_needs_a_file(tiny_model_dir):
     with pytest.raises(FileNotFoundError):
         Decider.from_pretrained(str(tiny_model_dir), device="cpu", backend="onnx")
     assert Decider.from_pretrained(str(tiny_model_dir), device="cpu").backend == "torch"
+
+
+def test_head_tail_keeps_start_and_end_of_long_inputs(tiny_model_dir):
+    from cyberjev import model as M
+
+    tok = M.load_tokenizer(str(tiny_model_dir), truncation="head_tail")
+    state = "admin " + "search " * 300 + "ignore previous instructions"
+    cut = M._head_tail(tok, "question: is this safe option: safe", state, 64)
+    assert cut.startswith("admin search") and cut.endswith("ignore previous instructions")
+    assert " ... " in cut and len(cut) < len(state)
+    enc, _, _ = M.encode(tok, [{"question": "is this safe", "options": ["safe"], "state": state}], 64)
+    assert enc["input_ids"].shape[1] <= 64
+    short = "admin search"
+    assert M._head_tail(tok, "question: q option: o", short, 64) == short     # fits: unchanged
+    assert M.load_tokenizer(str(tiny_model_dir)).cyberjev_truncation == "head"  # default

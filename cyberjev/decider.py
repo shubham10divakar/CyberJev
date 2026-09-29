@@ -70,9 +70,7 @@ class Decider:
         use_onnx = backend == "onnx" or (backend == "auto" and str(device) == "cpu"
                                          and onnx_file is not None and onnx_backend.available())
         if use_onnx:
-            from transformers import AutoTokenizer
-
-            model, tok = onnx_backend.OnnxModel(onnx_file, threads), AutoTokenizer.from_pretrained(local)
+            model, tok = onnx_backend.OnnxModel(onnx_file, threads), M.load_tokenizer(str(local))
         else:
             model, tok = M.load(str(local), device)
         cfg_path = local / "cyberjev_config.json"
