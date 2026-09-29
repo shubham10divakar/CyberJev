@@ -169,3 +169,26 @@ Working joint model: `runs/cyber-jev-v5-l6` (data v5; seeds s1, s2 exist). Next,
 - Recalibrate on `data_val` (out-of-domain) and re-check held-out ECE / false blocks.
 - Single-decision cross-encoder on v5 (3 seeds) to separate "question format" from "joint".
 - Item 6: one public detector per decision; item 13: dataset-hygiene table.
+
+### 10. ✅ Released v0.1 on Hugging Face (2026-09-29, user's go)
+
+- **`sdmlai/cyber-jev`**, public, tag **`v0.1`**, licence **CC-BY-NC-4.0** (user's choice:
+  training data includes `shengqin/web-attacks` with no licence, CSIC research terms, Dolly
+  CC-BY-SA, WildJailbreak ODC-BY). Commit `3fea0b1`.
+- Contents = `runs/cyber-jev-v5-l6` (joint, data v5, seed 0): `model.safetensors`,
+  `model.int8.onnx`, `calibration.json`, `one_pass.json`, `calibration.model.int8.json`,
+  `one_pass.model.int8.json`, tokenizer, `config.json`, `cyberjev_config.json` (now with
+  version 0.1, status "research preview", released 2026-09-29, license, params 22.7M,
+  base `sdmlai/nano-jev@v0.1`, train data / hparams), and a model card (README) with 3-seed
+  results, latency, the out-of-domain calibration caveat, PI limitation, known issues, data
+  licences and a "paper in preparation" citation. fp32 `model.onnx` not uploaded (regenerate
+  with `onnx_cpu.py`).
+- Checked: the release folder gives the same outputs as the run folder on both backends;
+  `cyberjev.load("v0.1")` downloads and runs (ONNX int8 on CPU); `cyber-jev list` shows it;
+  network tests (`CYBERJEV_NETWORK_TESTS=1`) pass with `RELEASED = {"v0.1": "0.1"}`.
+- **Local weights:** by the user's choice only `runs/cyber-jev-v5-l6` is kept; all other run
+  folders (dev, v2*, v3*, v4*, v5 seeds 1/2, v5ht, v5ml512, v6*) are to be deleted. Their
+  numbers stay in `results/`, but **3-seed analyses can no longer be re-run without
+  retraining** (e.g. recalibration on val over 3 seeds needs `DATA=data_v5 bash
+  scripts/m4_runs.sh 1 v5 joint` and `… 2 …` again, ~25 min each).
+- Not done: PyPI release (M7, only when asked); GitHub push of these commits (only when asked).

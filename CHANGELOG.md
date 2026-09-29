@@ -1,5 +1,12 @@
 # Changelog
 
+## Weights v0.1 (2026-09-29)
+
+- Published on Hugging Face: [`sdmlai/cyber-jev`](https://huggingface.co/sdmlai/cyber-jev),
+  tag `v0.1`, CC-BY-NC-4.0. Joint model for `http_attack`, `prompt_injection` and
+  `phishing_url` (data v5, 6 layers, 22.7M parameters) with int8 ONNX and per-decision
+  calibration; the package default `v0.1` now resolves to it.
+
 ## 0.1.0.dev0 (unreleased)
 
 - Forked from Nano-Jev 1.0.0: same model, calibration, registry and CLI; package renamed
