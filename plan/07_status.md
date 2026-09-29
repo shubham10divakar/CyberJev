@@ -314,3 +314,28 @@ int8 costs no accuracy. On val the int8 Decider scores AUROC 0.914 (PyTorch 0.91
 0.883, and still flags **0** Spider queries. Latency ≤ 5 ms holds with the v3 model.
 One-pass costs held-out AUROC here (0.934 vs 0.951 two-pass on the sample), within the
 noise seen across seeds, and val picked it.
+
+## M3 — data v4 baselines (2026-09-29)
+
+`scripts/baselines.py` on the two new decisions (`results/tfidf_v4*.md`, `results/length_v4*.md`;
+`--length` = text length alone). AUROC, calibrated on v4 calib; destroylist is phishing-only,
+so its column is the share caught at 0.5.
+
+| decision | set | TF-IDF + LR | length only |
+|---|---|---|---|
+| prompt_injection | in-domain (S-Labs, neuralchemy) | 0.992 | 0.579 |
+| | held-out deepset | 0.904 | 0.813 |
+| | held-out jackhhao | 0.952 | **0.868** |
+| | **val (in-the-wild, length-matched)** | **0.740** | 0.502 |
+| phishing_url | in-domain (flwrlabs) | 0.960 | 0.544 |
+| | held-out PhishTrap | 0.780 | **0.861** |
+| | held-out destroylist (DR@0.5) | 0.354 | 0.093 |
+| | **val (JPxxx)** | **0.927** | 0.660 |
+
+- **Held-out is length-flattered for both new decisions.** On PhishTrap, length alone beats
+  TF-IDF (0.861 vs 0.780); on jackhhao it gets 0.868. Every held-out result for these
+  decisions must be read next to the length baseline.
+- **Val is the harder, cleaner check:** in-the-wild prompts have no length signal and TF-IDF
+  only reaches 0.740; JPxxx is closer to training (TF-IDF 0.927).
+- In-domain is easy for TF-IDF (0.96–0.99), as it was for http_attack. The M4 model has to
+  beat TF-IDF out of domain, where M2 showed the cross-encoder's advantage.
